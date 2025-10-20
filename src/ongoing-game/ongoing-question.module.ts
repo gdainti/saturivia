@@ -3,13 +3,15 @@ import { OngoingQuestionService } from './ongoing-question.service';
 import { MongooseModule } from '@nestjs/mongoose';
 import { OngoingQuestion, OngoingQuestionSchema } from 'src/schemas/ongoing-question.schema';
 import { QuestionModule } from 'src/question/question.module';
-import { PlayerService } from 'src/player/player.service';
+import { PlayerModule } from 'src/player/player.module';
 
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: OngoingQuestion.name, schema: OngoingQuestionSchema }]),
     QuestionModule,
+    PlayerModule,
   ],
-  providers: [OngoingQuestionService, PlayerService]
+  providers: [OngoingQuestionService],
+  exports: [OngoingQuestionService]
 })
 export class OngoingQuestionModule { }

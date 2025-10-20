@@ -4,6 +4,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PlayerModule } from './player/player.module';
 import { QuestionModule } from './question/question.module';
 import { OngoingQuestionModule } from './ongoing-game/ongoing-question.module';
+import { TelegramModule } from './telegram/telegram.module';
 
 @Module({
   imports: [
@@ -13,16 +14,16 @@ import { OngoingQuestionModule } from './ongoing-game/ongoing-question.module';
     }),
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => {
-        const username = configService.get('MONGO_USERNAME');
-        const password = configService.get('MONGO_PASSWORD');
-        const host = configService.get('MONGO_HOST');
-        const port = configService.get('MONGO_PORT');
-        const database = configService.get('MONGO_DATABASE');
-        const authDB = configService.get('MONGO_AUTH_DB');
+      useFactory: (configService: ConfigService) => {
+        const username = configService.get<string>('MONGO_USERNAME');
+        const password = configService.get<string>('MONGO_PASSWORD');
+        const host = configService.get<string>('MONGO_HOST');
+        const port = configService.get<string>('MONGO_PORT');
+        const database = configService.get<string>('MONGO_DATABASE');
+        const authDB = configService.get<string>('MONGO_AUTH_DB');
 
-        const safeUsername = encodeURIComponent(username);
-        const safePassword = encodeURIComponent(password);
+        const safeUsername = encodeURIComponent(username ?? '');
+        const safePassword = encodeURIComponent(password ?? '');
 
         const uri = `mongodb://${safeUsername}:${safePassword}@${host}:${port}/${database}`;
 
@@ -39,6 +40,7 @@ import { OngoingQuestionModule } from './ongoing-game/ongoing-question.module';
     PlayerModule,
     QuestionModule,
     OngoingQuestionModule,
+    TelegramModule,
   ],
   controllers: [],
   providers: [],

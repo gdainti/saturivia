@@ -60,6 +60,30 @@ export class OngoingQuestionService {
     return updatedGame;
   }
 
-  // checkAnswer(chatId: number, answer: string): Promise<boolean>
-  // endCurrentGame(chatId: number): Promise<void>
+  async checkAnswer(chatId: number, answer: string, telegramUserId?: number, username?: string): Promise<boolean> {
+    const game = await this.ongoingQuestionModel.findOne({ telegramChatId: chatId, isDeleted: false }).populate('questionId').exec();
+    if (!game) throw new NotFoundException(`No active game found for chat ${chatId}`);
+
+    const correctAnswer = (game.questionId as any).answer as string;
+    if (!correctAnswer) return false;
+
+    const normalizedGiven = answer.trim().toLowerCase();
+    const normalizedCorrect = correctAnswer.trim().toLowerCase();
+
+    const isCorrect = normalizedCorrect.includes(normalizedGiven) || normalizedGiven.includes(normalizedCorrect) || normalizedGiven === normalizedCorrect;
+
+    if (isCorrect && telegramUserId) {
+      const player = await this.playerService.findOrCreatePlayer(telegramUserId, username);
+      await this.playerService.recordPlayerAnswer((game.questionId as any)._id as string, (player as any)._id as string, 1);
+    }
+
+    return isCorrect;
+  }
+
+  async endCurrentGame(chatId: number): Promise<void> {
+    await this.ongoingQuestionModel.findOneAndUpdate(
+      { telegramChatId: chatId, isDeleted: false },
+      { $set: { isDeleted: true, guesserId: null, clue: null } }
+    ).exec();
+  }
 }
