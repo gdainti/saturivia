@@ -5,6 +5,7 @@ import path from 'path';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../src/app.module';
 import { QuestionService } from '../src/question/question.service';
+import { QUESTION_TYPE } from 'src/question/question-type';
 
 async function run() {
   const app = await NestFactory.createApplicationContext(AppModule);
@@ -112,7 +113,7 @@ async function run() {
   // Hardcoded fields that will be added to each inserted document
   const DEFAULT_LANGUAGE = 'ru';
   const DEFAULT_DIFFICULTY = undefined;
-  const DEFAULT_TYPE = 'trivia';
+  const DEFAULT_TYPE = QUESTION_TYPE.TRIVIA;
   const DEFAULT_COMMENT = '';
   const DEFAULT_HINT = '';
 

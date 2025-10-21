@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { Player, PlayerDocument } from 'src/schemas/player.schema';
-import { QuestionHistory, QuestionHistoryDocument } from 'src/schemas/question-history.schema';
+import { Player, PlayerDocument } from 'src/player/player.schema';
+import { QuestionHistory, QuestionHistoryDocument } from 'src/question/question-history.schema';
 
 export interface UpsertAnswerResult {
 	created: boolean;

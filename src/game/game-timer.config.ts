@@ -12,9 +12,9 @@ export interface GameTimings {
 // in seconds
 export const GAME_TIMINGS: GameTimings = {
   trivia: {
-    clue1: 20,
-    clue2: 30,
-    result: 30,
+    clue1: 5,
+    clue2: 5,
+    result: 5,
   },
   chgk: {
     clue1: 60,

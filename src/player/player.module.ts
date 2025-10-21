@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 import { PlayerService } from './player.service';
 import { MongooseModule } from '@nestjs/mongoose';
-import { Player, PlayerSchema } from 'src/schemas/player.schema';
-import { QuestionHistory, QuestionHistorySchema } from 'src/schemas/question-history.schema';
+import { Player, PlayerSchema } from 'src/player/player.schema';
+import { QuestionHistory, QuestionHistorySchema } from 'src/question/question-history.schema';
 
 @Module({
   imports: [

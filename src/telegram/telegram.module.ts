@@ -2,7 +2,7 @@ import { Module, forwardRef, OnModuleDestroy } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { QuestionModule } from 'src/question/question.module';
 import { PlayerModule } from 'src/player/player.module';
-import { OngoingQuestionModule } from 'src/ongoing-game/ongoing-question.module';
+import { GameModule } from 'src/game/game.module';
 import { TelegramService } from 'src/telegram/telegram.service';
 
 @Module({
@@ -10,7 +10,7 @@ import { TelegramService } from 'src/telegram/telegram.service';
     ConfigModule,
     QuestionModule,
     PlayerModule,
-    forwardRef(() => OngoingQuestionModule),
+    forwardRef(() => GameModule),
   ],
   providers: [TelegramService],
   exports: [TelegramService],

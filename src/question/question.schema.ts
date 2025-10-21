@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
+import { QUESTION_TYPE } from 'src/question/question-type';
 
 export type QuestionDocument = Question & Document;
 
@@ -28,8 +29,7 @@ export class Question {
   difficulty: number;
 
   // different types of question: trivia-like or logical deduction
-  // 'trivia', 'chgk'
-  @Prop({ required: true, default: 'trivia' })
+  @Prop({ required: true, default: QUESTION_TYPE.TRIVIA })
   type: string;
 
   // answer explanation
