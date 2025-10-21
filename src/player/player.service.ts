@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { Player, PlayerDocument } from 'src/schemas/player.shema';
+import { Player, PlayerDocument } from 'src/schemas/player.schema';
 import { PlayerAnswer, PlayerAnswerDocument } from 'src/schemas/player-answer.schema';
 
 export interface UpsertAnswerResult {

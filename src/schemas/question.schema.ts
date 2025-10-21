@@ -24,7 +24,7 @@ export class Question {
   @Prop({ required: false, type: Number, default: 1 })
   difficulty: number;
 
-  @Prop({ default: null, type: Date })
+  @Prop({ default: new Date(), type: Date })
   lastAskedAt: Date | null;
 
   @Prop({ default: false })

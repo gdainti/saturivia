@@ -39,7 +39,7 @@ import { TelegramModule } from './telegram/telegram.module';
 
     PlayerModule,
     QuestionModule,
-    OngoingQuestionModule,
+  OngoingQuestionModule,
     TelegramModule,
   ],
   controllers: [],

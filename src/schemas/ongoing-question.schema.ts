@@ -1,11 +1,14 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Schema as MongooseSchema } from 'mongoose';
 import { Question } from './question.schema';
-import { Player } from 'src/schemas/player.shema';
+import { Player } from 'src/schemas/player.schema';
 
 export enum GAME_STAGE {
   CLUE_0 = 'CLUE_0',
   CLUE_1 = 'CLUE_1',
+  CLUE_2 = 'CLUE_2',
+  CLUE_3 = 'CLUE_3',
+  ANSWER_REVEALED = 'ANSWER_REVEALED',
 }
 
 export type OngoingQuestionDocument = OngoingQuestion & Document;
@@ -45,6 +48,9 @@ export class OngoingQuestion {
 
   @Prop({ default: null })
   clue: string;
+
+  @Prop({ type: Date, default: null })
+  lastClueAt: Date | null;
 }
 
 export const OngoingQuestionSchema = SchemaFactory.createForClass(OngoingQuestion);

@@ -1,6 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Schema as MongooseSchema } from 'mongoose';
-import { Player } from 'src/schemas/player.shema';
+import { Player } from 'src/schemas/player.schema';
 import { Question } from 'src/schemas/question.schema';
 
 export type PlayerAnswerDocument = PlayerAnswer & Document;
