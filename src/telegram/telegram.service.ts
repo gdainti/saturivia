@@ -1,10 +1,9 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, OnModuleDestroy, Inject, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Telegraf } from 'telegraf';
 import { QuestionService } from 'src/question/question.service';
 import { PlayerService } from 'src/player/player.service';
 import { OngoingQuestionService } from 'src/ongoing-game/ongoing-question.service';
-import { QuestionDocument } from 'src/schemas/question.schema';
 import { OngoingQuestion } from 'src/schemas/ongoing-question.schema';
 
 @Injectable()
@@ -12,11 +11,66 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(TelegramService.name);
   private bot: Telegraf | null = null;
 
+  private readonly commands: Record<string, { description: string; handler: (ctx: any) => Promise<void> }> = {
+    help: {
+      description: 'How to play',
+      handler: async (ctx) => {
+        await ctx.reply('Help information coming soon');
+      },
+    },
+    trivia: {
+      description: 'Start a new trivia question',
+      handler: async (ctx) => {
+        const chatId = ctx.chat?.id;
+        const messageId = ctx.message?.message_id;
+        if (!chatId) {
+          this.logger.warn('No chatId in /trivia command');
+          return;
+        }
+        let game: OngoingQuestion | null = null;
+        try {
+          game = await this.ongoingQuestionService.getGame(chatId, messageId);
+        } catch (err) {
+          this.logger.error('Error checking existing game', err);
+        }
+        if (!game) {
+          game = await this.ongoingQuestionService.startNewGame(chatId, messageId);
+          if (!game || !game.questionId?.question || !game.questionId?.answer) {
+            await ctx.reply('Error: could not start a new game.');
+            return;
+          }
+        }
+        const question = game.questionId.question;
+        const answer = game.questionId.answer;
+        await ctx.reply(
+          this.renderQuestionMessage(
+            question,
+            answer,
+            game.questionId.difficulty,
+            game.questionId.category,
+          ),
+        );
+      },
+    },
+    scoreboard: {
+      description: 'View the top 5 players',
+      handler: async (ctx) => {
+        const top = await this.playerService.getTopPlayers(5);
+        if (!top || top.length === 0) {
+          await ctx.reply('No scores yet. Play some games!');
+          return;
+        }
+        const lines = top.map((t, i) => `${i + 1}. ${t.username ?? t.telegramId} — ${t.totalScore}`);
+        await ctx.reply(['Top players:', ...lines].join('\n'));
+      },
+    },
+  };
+
   constructor(
     private configService: ConfigService,
     private questionService: QuestionService,
     private playerService: PlayerService,
-    private ongoingQuestionService: OngoingQuestionService,
+    @Inject(forwardRef(() => OngoingQuestionService)) private ongoingQuestionService: OngoingQuestionService,
   ) { }
 
   onModuleInit() {
@@ -28,14 +82,31 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private renderQuestionMessage(question: string, label: string = 'Question:', difficulty: string | number, category?: string): string {
-    let message = `${label} ${question}\n`;
+  private renderQuestionMessage(question: string, answer: string, difficulty: string | number, category?: string): string {
+    let message = `${question}\n---\n`;
     if (category) {
-      message += `Category: ${category}\n`;
+      message += `category: ${category}\n`;
     }
     if (difficulty) {
-      message += `Difficulty: ${difficulty}\n`;
+      message += `difficulty: ${difficulty}\n`;
     }
+
+    const wordCount = answer.trim().split(/\s+/).filter(word => word.length > 0).length;
+    if (wordCount > 1) {
+      message += `words: ${wordCount}\n`;
+    }
+
+    const charCount = answer.replace(/\s/g, '').length;
+    message += `characters: ${charCount}\n`;
+
+    const questionMask = answer.replace(/[\p{L}\p{N}]/gu, '*');
+    message += `mask: ${questionMask}\n`;
+
+    const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
+    if (!isProduction) {
+      message += `debug: ${answer}\n`;
+    }
+
     return message;
   }
 
@@ -67,39 +138,40 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       await ctx.reply('Help information coming soon');
     });
 
-    this.bot.command('question', async (ctx) => {
+    this.bot.command('trivia', async (ctx) => {
+
       const chatId = ctx.chat?.id;
-      if (!chatId) return;
+      const messageId = ctx.message?.message_id;
 
+      if (!chatId) {
+        this.logger.warn('No chatId in /trivia command');
+        return;
+      }
+
+      let game: OngoingQuestion | null = null;
       try {
-        const existing: OngoingQuestion = await this.ongoingQuestionService.getGame(chatId);
-        const existingQuestion = existing.questionId?.question ?? 'An active question is already running.';
-        await ctx.reply(
-          this.renderQuestionMessage(
-            existingQuestion,
-            'Question:',
-            existing.questionId?.difficulty,
-            existing.questionId?.category,
-          ),
-        );
-        return;
+        game = await this.ongoingQuestionService.getGame(chatId, messageId);
       } catch (err) {
-        console.error('Error checking existing game', err);
+        this.logger.error('Error checking existing game', err);
       }
 
-      const game = await this.ongoingQuestionService.startNewGame(chatId);
       if (!game) {
-        await ctx.reply('Could not start a new game.');
-        return;
+        game = await this.ongoingQuestionService.startNewGame(chatId, messageId);
+        if (!game || !game.questionId?.question || !game.questionId?.answer) {
+          await ctx.reply('Error: could not start a new game.');
+          return;
+        }
       }
 
-      const question = game?.questionId?.question ?? 'No question available';
+      const question = game.questionId.question;
+      const answer = game.questionId.answer;
+
       await ctx.reply(
         this.renderQuestionMessage(
           question,
-          'Question:',
-          game?.questionId?.difficulty,
-          game?.questionId?.category,
+          answer,
+          game.questionId.difficulty,
+          game.questionId.category,
         ),
       );
     });
@@ -119,6 +191,8 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
 
     this.bot.on('text', async (ctx) => {
       const chatId = ctx.chat?.id;
+      const messageId = ctx.message?.message_id;
+
       const from = ctx.from;
       const text = ctx.message?.text ?? '';
       if (!chatId || !from || !text) return;
@@ -126,13 +200,13 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       if (text.startsWith('/')) return;
 
       try {
-        const game = await this.ongoingQuestionService.getGame(chatId);
-        const isCorrect = await this.ongoingQuestionService.checkAnswer(chatId, text, from.id, from.username);
+        const game = await this.ongoingQuestionService.getGame(chatId, messageId);
+        const isCorrect = await this.ongoingQuestionService.checkAnswer(chatId, messageId, text, from.id, from.username);
 
         if (isCorrect) {
           const correctAnswer = game?.questionId?.answer ?? 'the answer';
           await ctx.reply(`🎉 Correct! The answer was: ${correctAnswer}.\nScore: +1`);
-          await this.ongoingQuestionService.endCurrentGame(chatId);
+          await this.ongoingQuestionService.endCurrentGame(chatId, messageId);
         } else {
           const correctAnswer = game?.questionId?.answer ?? '';
           try {
@@ -155,7 +229,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
           }
         }
       } catch (err) {
-        // if no active game, ignore
+        this.logger.error('Error processing text message', err);
       }
     });
 
@@ -165,12 +239,8 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
   private async setBotCommands() {
     if (!this.bot) return;
 
-    // Define all your commands here, matching your handlers
-    const commands = [
-      { command: 'help', description: 'How to play' },
-      { command: 'question', description: 'Start a new trivia question' },
-      { command: 'scoreboard', description: 'View the top 5 players' },
-    ];
+    const commands = Object.entries(this.commands)
+      .map(([command, { description }]) => ({ command, description }));
 
     try {
       await this.bot.telegram.setMyCommands(commands);
@@ -194,6 +264,19 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
           this.logger.error('Error while stopping Telegram bot', err);
         }
       }
+    }
+  }
+
+  async sendMessage(chatId: number, messageId: number, text: string): Promise<void> {
+    if (this.bot) {
+
+      const extra = {
+        parse_mode: 'HTML' as import('telegraf/types').ParseMode,
+      }
+
+      await this.bot.telegram.sendMessage(chatId, text, extra);
+    } else {
+      this.logger.warn('Bot not initialized. Cannot send message.');
     }
   }
 }

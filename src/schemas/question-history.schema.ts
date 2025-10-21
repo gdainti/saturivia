@@ -21,10 +21,10 @@ export class QuestionHistory {
   @Prop({
     type: MongooseSchema.Types.ObjectId,
     ref: 'Player',
-    required: true,
+    required: false,
     index: true
   })
-  playerId: Player;
+  playerId?: Player;
 
   @Prop({ required: false, type: Number, default: 1 })
   score: number;
@@ -35,4 +35,11 @@ export class QuestionHistory {
 
 export const QuestionHistorySchema = SchemaFactory.createForClass(QuestionHistory);
 
-QuestionHistorySchema.index({ questionId: 1, playerId: 1 }, { unique: true });
+// Index for questions with players who answered
+QuestionHistorySchema.index({ questionId: 1, playerId: 1 }, {
+  unique: true,
+  sparse: true // Allows multiple null values for playerId
+});
+
+// Index for unanswered questions (where playerId is null)
+QuestionHistorySchema.index({ questionId: 1, createdAt: 1 });

@@ -27,8 +27,6 @@ import { TelegramModule } from './telegram/telegram.module';
 
         const uri = `mongodb://${safeUsername}:${safePassword}@${host}:${port}/${database}`;
 
-        console.log(`Connecting to MongoDB "${database}" database`);
-
         return {
           uri: uri,
           authSource: authDB,

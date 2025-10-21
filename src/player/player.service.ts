@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Player, PlayerDocument } from 'src/schemas/player.schema';
-import { PlayerAnswer, PlayerAnswerDocument } from 'src/schemas/player-answer.schema';
+import { QuestionHistory, QuestionHistoryDocument } from 'src/schemas/question-history.schema';
 
 export interface UpsertAnswerResult {
 	created: boolean;
@@ -14,7 +14,7 @@ export class PlayerService {
 	private readonly logger = new Logger(PlayerService.name);
 	constructor(
 		@InjectModel(Player.name) private playerModel: Model<PlayerDocument>,
-		@InjectModel(PlayerAnswer.name) private playerAnswerModel: Model<PlayerAnswerDocument>,
+		@InjectModel(QuestionHistory.name) private questionHistoryModel: Model<QuestionHistoryDocument>,
 	) {}
 
 	async findOrCreatePlayer(telegramId: number, username?: string) {
@@ -26,7 +26,7 @@ export class PlayerService {
 
 	async recordPlayerAnswer(questionId: string, playerId: string, score = 1): Promise<UpsertAnswerResult> {
 		try {
-			const res = await this.playerAnswerModel.findOneAndUpdate(
+			const res = await this.questionHistoryModel.findOneAndUpdate(
 				{ questionId, playerId },
 				{ $inc: { score }, $setOnInsert: { isDeleted: false } },
 				{ upsert: true, new: true, setDefaultsOnInsert: true }
@@ -41,7 +41,7 @@ export class PlayerService {
 
 	async getTopPlayers(limit = 5) {
 		const pipeline = [
-			{ $match: { isDeleted: false } },
+			{ $match: { isDeleted: false, playerId: { $exists: true, $ne: null } } }, // Only answered questions
 			{ $group: { _id: '$playerId', totalScore: { $sum: '$score' } } },
 			{ $sort: { totalScore: -1 } },
 			{ $limit: limit },
@@ -57,7 +57,81 @@ export class PlayerService {
 			{ $project: { playerId: '$_id', totalScore: 1, username: '$player.username', telegramId: '$player.telegramId' } }
 		];
 
-		const res = await this.playerAnswerModel.aggregate(pipeline as any).exec();
+		const res = await this.questionHistoryModel.aggregate(pipeline as any).exec();
 		return res as Array<{ playerId: string; totalScore: number; username?: string; telegramId?: number }>;
+	}
+
+	async recordUnansweredQuestion(questionId: string): Promise<QuestionHistory> {
+		try {
+			const questionHistory = await this.questionHistoryModel.create({
+				questionId,
+				playerId: null,
+				score: 0,
+				isDeleted: false
+			});
+			return questionHistory;
+		} catch (err) {
+			this.logger.error('Failed to record unanswered question', err);
+			throw err;
+		}
+	}
+
+	async getPlayerStats(playerId: string) {
+		const pipeline = [
+			{ $match: { playerId, isDeleted: false } },
+			{
+				$group: {
+					_id: null,
+					totalAnswered: { $sum: 1 },
+					totalScore: { $sum: '$score' },
+					averageScore: { $avg: '$score' }
+				}
+			}
+		];
+
+		const stats = await this.questionHistoryModel.aggregate(pipeline).exec();
+		const unanswered = await this.questionHistoryModel.countDocuments({
+			playerId: null,
+			isDeleted: false
+		});
+
+		return {
+			totalAnswered: stats[0]?.totalAnswered || 0,
+			totalScore: stats[0]?.totalScore || 0,
+			averageScore: stats[0]?.averageScore || 0,
+			totalUnanswered: unanswered
+		};
+	}
+
+	async getQuestionStats(questionId: string) {
+		const pipeline = [
+			{ $match: { questionId, isDeleted: false } },
+			{
+				$group: {
+					_id: { answered: { $ne: ['$playerId', null] } },
+					count: { $sum: 1 }
+				}
+			}
+		];
+
+		const stats = await this.questionHistoryModel.aggregate(pipeline).exec();
+
+		let answered = 0;
+		let unanswered = 0;
+
+		stats.forEach(stat => {
+			if (stat._id.answered) {
+				answered = stat.count;
+			} else {
+				unanswered = stat.count;
+			}
+		});
+
+		return {
+			totalAsked: answered + unanswered,
+			answered,
+			unanswered,
+			answerRate: answered + unanswered > 0 ? (answered / (answered + unanswered)) * 100 : 0
+		};
 	}
 }

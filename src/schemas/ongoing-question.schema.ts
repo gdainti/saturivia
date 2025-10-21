@@ -7,8 +7,7 @@ export enum GAME_STAGE {
   CLUE_0 = 'CLUE_0',
   CLUE_1 = 'CLUE_1',
   CLUE_2 = 'CLUE_2',
-  CLUE_3 = 'CLUE_3',
-  ANSWER_REVEALED = 'ANSWER_REVEALED',
+  REVEAL = 'REVEAL',
 }
 
 export type OngoingQuestionDocument = OngoingQuestion & Document;
@@ -25,12 +24,15 @@ export class OngoingQuestion {
   })
   questionId: Question;
 
-  @Prop({ required: true, unique: true, index: true })
+  @Prop({ required: true, unique: false, index: true })
   telegramChatId: number;
+
+  @Prop({ required: true, unique: false, index: true })
+  telegramMessageId: number;
 
   @Prop({
     required: true,
-    enum: [GAME_STAGE.CLUE_0, GAME_STAGE.CLUE_1],
+    enum: Object.values(GAME_STAGE),
     default: GAME_STAGE.CLUE_0
   })
   stage: GAME_STAGE;

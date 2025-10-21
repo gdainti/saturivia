@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Question, QuestionDocument } from 'src/schemas/question.schema';
@@ -6,6 +6,8 @@ import { Question, QuestionDocument } from 'src/schemas/question.schema';
 
 @Injectable()
 export class QuestionService {
+  private readonly logger = new Logger(QuestionService.name);
+
   constructor(
     @InjectModel(Question.name) private questionModel: Model<QuestionDocument>,
   ) {}
@@ -40,7 +42,7 @@ export class QuestionService {
           return oldestQuestion;
       }
 
-      throw new InternalServerErrorException('No questions available in the database.');
+      this.logger.log('No questions available in the database.');
     }
 
     return result[0] as Question;
