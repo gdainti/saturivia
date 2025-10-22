@@ -4,6 +4,7 @@ import { Model } from 'mongoose';
 import { GAME_STAGE } from 'src/game/game.schema';
 import { Question, QuestionDocument } from 'src/question/question.schema';
 import { QuestionHistory, QuestionHistoryDocument } from './question-history.schema';
+import { QUESTION_TYPE } from './question-type';
 
 export const MASK_CHARACTER = '●';
 @Injectable()
@@ -15,7 +16,7 @@ export class QuestionService {
     @InjectModel(QuestionHistory.name) private questionHistoryModel: Model<QuestionHistoryDocument>,
   ) { }
 
-  async getRandomQuestion(): Promise<Question> {
+  async getRandomQuestion(type: QUESTION_TYPE): Promise<Question> {
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
     const pipeline = [
@@ -25,7 +26,8 @@ export class QuestionService {
             { lastAskedAt: { $lt: twentyFourHoursAgo } },
             { lastAskedAt: { $eq: null } }
           ],
-          isDeleted: false
+          isDeleted: false,
+          type: String(type)
         },
       },
       {

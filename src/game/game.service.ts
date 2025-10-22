@@ -8,6 +8,7 @@ import { QuestionDocument } from 'src/question/question.schema';
 import { GameTimerService } from './game-timer.service';
 import { TelegramService } from '../telegram/telegram.service';
 import { QuestionHistory, QuestionHistoryDocument } from 'src/question/question-history.schema';
+import { QUESTION_TYPE } from 'src/question/question-type';
 
 @Injectable()
 export class GameService {
@@ -15,7 +16,6 @@ export class GameService {
   constructor(
     @InjectModel(Game.name) private gameModel: Model<GameDocument>,
     private questionService: QuestionService,
-    private playerService: PlayerService,
     private gameTimerService: GameTimerService,
     private telegramService: TelegramService,
     @InjectModel(QuestionHistory.name) private questionHistoryModel: Model<QuestionHistoryDocument>,
@@ -31,8 +31,8 @@ export class GameService {
     return game || null;
   }
 
-  async startNewGame(chatId: number, telegramMessageThreadId: number | undefined): Promise<Game | null> {
-    const question = await this.questionService.getRandomQuestion() as QuestionDocument;
+  async startNewGame(chatId: number, telegramMessageThreadId: number | undefined, type: QUESTION_TYPE): Promise<Game | null> {
+    const question = await this.questionService.getRandomQuestion(type) as QuestionDocument;
 
     if (!question) {
       return null;

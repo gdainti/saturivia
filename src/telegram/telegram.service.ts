@@ -104,7 +104,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
         }
 
         if (!game) {
-          game = await this.gameService.startNewGame(chatId, telegramMessageThreadId);
+          game = await this.gameService.startNewGame(chatId, telegramMessageThreadId, QUESTION_TYPE.TRIVIA);
           if (!game || !game.question?.question || !game.question?.answer) {
             await this.reply(ctx, '❌ Error: could not start a new game.');
             return;
