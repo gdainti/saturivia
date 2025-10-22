@@ -68,7 +68,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       command: 'help',
       description: 'How to play',
       action: async (ctx) => {
-        await this.reply(ctx, 'Help information here');
+        await this.reply(ctx, '🚧 Help information here');
       }
     },
     {
@@ -77,7 +77,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       action: async (ctx) => {
         const top = await this.playerService.getTopPlayers(10);
         if (!top || top.length === 0) {
-          await this.reply(ctx, 'No scores yet. Play some games!');
+          await this.reply(ctx, '🫙 No scores yet. Play some games!');
           return;
         }
         const lines = top.map((t, i) => `${i + 1}. ${t.username ?? t.telegramId} — <b>${t.totalScore}</b>`);
@@ -106,7 +106,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
         if (!game) {
           game = await this.gameService.startNewGame(chatId, telegramMessageThreadId);
           if (!game || !game.question?.question || !game.question?.answer) {
-            await this.reply(ctx, 'Error: could not start a new game.');
+            await this.reply(ctx, '❌ Error: could not start a new game.');
             return;
           }
         }
@@ -138,7 +138,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
           return;
         }
 
-        await ctx.reply('CHGK questions are in development and will be available soon!');
+        await ctx.reply('🚧 CHGK questions are in development and will be available soon!');
 
       }
     }
@@ -162,22 +162,31 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     return { type, isDM, isGroup, isChannel, isThread };
   }
 
+  private renderDifficulty(difficulty: string | number): string {
+    const level = Math.min(Math.max(Number(difficulty) || 0, 0), 3);
+    const filled = '★'.repeat(level);
+    const empty = '☆'.repeat(3 - level);
+    return filled + empty;
+  }
+
   public renderQuestionMessage(question: string, hint: string, difficulty: string | number, category?: string, debug?: string): string {
-    let message = `${question}\n---\n`;
-    if (category) {
-      message += `category: ${category}\n`;
-    }
+    let message = `❔ <b>${question}</b>\n\n`;
+
+    const charCount = hint.replace(/\s/g, '').length;
+    message += `💡 <b>${hint}</b> [${charCount}]\n`;
+    message += '\n---\n';
+
     if (difficulty) {
-      message += `difficulty: ${difficulty}\n`;
+      message += `difficulty: ${this.renderDifficulty(difficulty)}\n`;
     }
+
+    message += `category: ${category || '-'}\n`;
 
     const wordCount = hint.trim().split(/\s+/).filter(word => word.length > 0).length;
     if (wordCount > 1) {
       message += `words: ${wordCount}\n`;
     }
 
-    const charCount = hint.replace(/\s/g, '').length;
-    message += `hint: ${hint} [${charCount}]\n`;
 
     const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
     if (!isProduction && debug) {
@@ -195,7 +204,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
   }
 
   public async revealAnswer(chatId: number, telegramMessageThreadId: number | undefined, question: QuestionDocument): Promise<void> {
-    await this.sendMessage(chatId, telegramMessageThreadId, `Answer: ${question.answer}\n${this.getPlayAgainLink(question.type)}`);
+    await this.sendMessage(chatId, telegramMessageThreadId, `Answer: <b>${question.answer}</b>\n${this.getPlayAgainLink(question.type)}`);
   }
 
   private async init() {
@@ -229,8 +238,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     if (!type || !this.bot?.botInfo?.username) {
       return '';
     }
-
-    return `\n🔄 /${type}@${this.bot?.botInfo?.username}`;
+    return `\n🔄play again /${type}@${this.bot?.botInfo?.username}`;
   }
 
   private setBotTextActions() {
@@ -241,7 +249,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     }
 
     this.bot.start(async (ctx) => {
-      await this.reply(ctx, 'Welcome to Saturivia! Have fun!');
+      await this.reply(ctx, 'Welcome to Saturivia🪐! Have fun!');
     });
 
     this.bot.on('message', async (ctx, next) => {
@@ -296,6 +304,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
             score,
             String(player._id),
           );
+          // TODO show scoreboard if player entered scoreboard
         } else {
           const randomReaction = WRONG_ANSWER_REACTIONS[Math.floor(Math.random() * WRONG_ANSWER_REACTIONS.length)];
           this.bot?.telegram.setMessageReaction(chatId, ctx.message.message_id, [randomReaction]);

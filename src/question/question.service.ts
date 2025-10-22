@@ -5,7 +5,7 @@ import { GAME_STAGE } from 'src/game/game.schema';
 import { Question, QuestionDocument } from 'src/question/question.schema';
 import { QuestionHistory, QuestionHistoryDocument } from './question-history.schema';
 
-export const MASK_CHARACTER = '*';
+export const MASK_CHARACTER = '●';
 @Injectable()
 export class QuestionService {
   private readonly logger = new Logger(QuestionService.name);
