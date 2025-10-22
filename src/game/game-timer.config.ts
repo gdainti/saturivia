@@ -12,27 +12,30 @@ export interface GameTimings {
 // in seconds
 export const GAME_TIMINGS: GameTimings = {
   trivia: {
-    clue1: 5,
-    clue2: 5,
-    result: 5,
+    clue1: 30,
+    clue2: 20,
+    result: 10,
   },
   chgk: {
     clue1: 60,
     clue2: 40,
-    result: 30,
+    result: 10,
   },
 };
 
+const DEBUG_TIMING = 5;
+
 export function getTimingForStage(questionType: string, stage: string): number {
   const timings = GAME_TIMINGS[questionType as keyof GameTimings] || GAME_TIMINGS.trivia;
+  const isProduction = process.env.NODE_ENV === 'production';
 
   switch (stage) {
     case 'CLUE_1':
-      return timings.clue1;
+      return isProduction ? timings.clue1 : DEBUG_TIMING;
     case 'CLUE_2':
-      return timings.clue2;
+      return isProduction ? timings.clue2 : DEBUG_TIMING;
     case 'RESULT':
-      return timings.result;
+      return isProduction ? timings.result : DEBUG_TIMING;
     default:
       return 0;
   }
