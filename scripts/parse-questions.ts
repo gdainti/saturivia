@@ -7,11 +7,11 @@ import * as path from 'path';
 
 // ===== CONFIGURATION SECTION =====
 
-const START_PAGE = 1486;
+const START_PAGE = 1;
 
 const PAGE_STEP = 15;
 
-const MAX_PAGES = 100; // Used as chunk size: save every MAX_PAGES processed pages
+const MAX_CHUNK_SIZE = 5;
 
 const BASE_URL = '';
 const URL_PATTERN = `${BASE_URL}/{page}`;
@@ -213,7 +213,7 @@ class QuestionScraper {
     console.log(`   URL Pattern: ${URL_PATTERN}`);
     console.log(`   Start Page: ${START_PAGE}`);
     console.log(`   Page Step: ${PAGE_STEP}`);
-    console.log(`   Max Pages: ${MAX_PAGES}`);
+    console.log(`   Max chunk size: ${MAX_CHUNK_SIZE}`);
     console.log(`   Question Selector: ${QUESTION_SELECTOR}`);
     console.log(`   Answer Selector: ${ANSWER_SELECTOR}`);
     console.log('');
@@ -266,7 +266,7 @@ class QuestionScraper {
         processedSinceChunkStart++;
 
         // If we've reached the chunk size, save and reset chunk state
-        if (processedSinceChunkStart >= MAX_PAGES) {
+        if (processedSinceChunkStart >= MAX_CHUNK_SIZE) {
           chunkIndex++;
           this.saveQuestionsToFile(pageNumber, chunkIndex);
           // clear chunkQuestions but keep allQuestions and seenQuestions for global dedupe/stats

@@ -1,36 +1,38 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Schema as MongooseSchema } from 'mongoose';
-import { Question } from './question.schema';
-import { Player } from 'src/schemas/player.schema';
+import { Question } from '../question/question.schema';
+import { Player } from 'src/player/player.schema';
 
 export enum GAME_STAGE {
   CLUE_0 = 'CLUE_0',
   CLUE_1 = 'CLUE_1',
   CLUE_2 = 'CLUE_2',
-  CLUE_3 = 'CLUE_3',
-  ANSWER_REVEALED = 'ANSWER_REVEALED',
+  REVEAL = 'REVEAL',
 }
 
-export type OngoingQuestionDocument = OngoingQuestion & Document;
+export type GameDocument = Game & Document;
 
 @Schema({
   timestamps: true,
-  collection: 'ongoingQuestions'
+  collection: 'games'
 })
-export class OngoingQuestion {
+export class Game {
   @Prop({
     type: MongooseSchema.Types.ObjectId,
     ref: 'Question',
     required: true
   })
-  questionId: Question;
+  question: Question;
 
-  @Prop({ required: true, unique: true, index: true })
+  @Prop({ required: true, unique: false, index: true })
   telegramChatId: number;
+
+  @Prop({ required: true, unique: false, index: true })
+  telegramMessageThreadId: number;
 
   @Prop({
     required: true,
-    enum: [GAME_STAGE.CLUE_0, GAME_STAGE.CLUE_1],
+    enum: Object.values(GAME_STAGE),
     default: GAME_STAGE.CLUE_0
   })
   stage: GAME_STAGE;
@@ -41,7 +43,7 @@ export class OngoingQuestion {
     required: false,
     default: null
   })
-  guesserId: Player;
+  guesser: Player;
 
   @Prop({ default: false })
   isDeleted: boolean;
@@ -53,4 +55,4 @@ export class OngoingQuestion {
   lastClueAt: Date | null;
 }
 
-export const OngoingQuestionSchema = SchemaFactory.createForClass(OngoingQuestion);
+export const GameSchema = SchemaFactory.createForClass(Game);

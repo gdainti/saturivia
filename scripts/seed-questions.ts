@@ -5,6 +5,7 @@ import path from 'path';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../src/app.module';
 import { QuestionService } from '../src/question/question.service';
+import { QUESTION_TYPE } from 'src/question/question-type';
 
 async function run() {
   const app = await NestFactory.createApplicationContext(AppModule);
@@ -59,8 +60,8 @@ async function run() {
     return s;
   };
 
-  // Normalize helper: clean, collapse whitespace, trim, case-insensitive
-  const normalize = (s: string) => cleanString(s).replace(/\s+/g, ' ').trim().toLowerCase();
+  // Normalize helper: clean, collapse whitespace, trim
+  const normalize = (s: string) => cleanString(s).replace(/\s+/g, ' ').trim();
 
   // Parse lines into { question, answer }
   const items: Array<{ question: string; answer: string }> = [];
@@ -112,6 +113,9 @@ async function run() {
   // Hardcoded fields that will be added to each inserted document
   const DEFAULT_LANGUAGE = 'ru';
   const DEFAULT_DIFFICULTY = undefined;
+  const DEFAULT_TYPE = QUESTION_TYPE.TRIVIA;
+  const DEFAULT_COMMENT = '';
+  const DEFAULT_HINT = '';
 
   for (const item of items) {
     const { question, answer } = item;
@@ -131,9 +135,19 @@ async function run() {
     }
 
     try {
-      await questionService.create({ question, answer, language: DEFAULT_LANGUAGE, difficulty: DEFAULT_DIFFICULTY });
+      await questionService.create({
+        question,
+        answer,
+        language: DEFAULT_LANGUAGE,
+        difficulty: DEFAULT_DIFFICULTY,
+        type: DEFAULT_TYPE,
+        comment: DEFAULT_COMMENT,
+        hint: DEFAULT_HINT,
+      });
+
       console.log('Inserted:', question);
       inserted++;
+
       // add to sets so we don't insert duplicates within this run
       existingQuestions.add(nq);
       existingAnswers.add(na);

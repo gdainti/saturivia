@@ -17,6 +17,12 @@ export class Player {
 
   @Prop({ default: false })
   isDeleted: boolean;
+
+  /* @Prop({ type: Number, default: 0 })
+  guesses: number;
+
+  @Prop({ type: Number, default: 0 })
+  score: number; */
 }
 
 export const PlayerSchema = SchemaFactory.createForClass(Player);

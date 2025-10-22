@@ -3,7 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PlayerModule } from './player/player.module';
 import { QuestionModule } from './question/question.module';
-import { OngoingQuestionModule } from './ongoing-game/ongoing-question.module';
+import { GameModule } from './game/game.module';
 import { TelegramModule } from './telegram/telegram.module';
 
 @Module({
@@ -27,8 +27,6 @@ import { TelegramModule } from './telegram/telegram.module';
 
         const uri = `mongodb://${safeUsername}:${safePassword}@${host}:${port}/${database}`;
 
-        console.log(`Connecting to MongoDB "${database}" database`);
-
         return {
           uri: uri,
           authSource: authDB,
@@ -39,10 +37,10 @@ import { TelegramModule } from './telegram/telegram.module';
 
     PlayerModule,
     QuestionModule,
-  OngoingQuestionModule,
+    GameModule,
     TelegramModule,
   ],
   controllers: [],
   providers: [],
 })
-export class AppModule {}
+export class AppModule { }
