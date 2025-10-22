@@ -6,16 +6,19 @@ import { PlayerService } from '../player/player.service';
 import { GAME_STAGE, Game, GameDocument } from 'src/game/game.schema';
 import { QuestionDocument } from 'src/question/question.schema';
 import { GameTimerService } from './game-timer.service';
+import { TelegramService } from '../telegram/telegram.service';
+import { QuestionHistory, QuestionHistoryDocument } from 'src/question/question-history.schema';
 
 @Injectable()
 export class GameService {
   private readonly logger = new Logger(GameService.name);
-
   constructor(
     @InjectModel(Game.name) private gameModel: Model<GameDocument>,
     private questionService: QuestionService,
     private playerService: PlayerService,
     private gameTimerService: GameTimerService,
+    private telegramService: TelegramService,
+    @InjectModel(QuestionHistory.name) private questionHistoryModel: Model<QuestionHistoryDocument>,
   ) { }
 
   async getGame(chatId: number, messageId: number | undefined): Promise<Game | null> {
@@ -78,28 +81,16 @@ export class GameService {
     return updatedGame;
   }
 
-  async checkAnswer(telegramChatId: number, telegramMessageThreadId: number | undefined, answer: string, telegramUserId?: number, username?: string): Promise<boolean> {
-    // TODO remove duplicated game fetching
-    const game = await this.gameModel.findOne({ telegramChatId: telegramChatId, isDeleted: false }).populate('question').exec();
+  async checkAnswer(telegramChatId: number, telegramMessageThreadId: number | undefined, givenAnswer: string, game: Game): Promise<boolean> {
     if (!game) throw new NotFoundException(`No active game found for chat ${telegramChatId} message ${telegramMessageThreadId}`);
 
     const correctAnswer = (game.question as any).answer as string;
     if (!correctAnswer) return false;
 
-    const normalizedGiven = answer.trim().toLowerCase();
+    const normalizedGiven = givenAnswer.trim().toLowerCase();
     const normalizedCorrect = correctAnswer.trim().toLowerCase();
 
     const isCorrect = normalizedCorrect.includes(normalizedGiven) || normalizedGiven.includes(normalizedCorrect) || normalizedGiven === normalizedCorrect;
-
-    if (isCorrect) {
-      // Stop the timer as game is won
-      await this.gameTimerService.stopTimer(telegramChatId, telegramMessageThreadId);
-
-      if (telegramUserId) {
-        const player = await this.playerService.findOrCreatePlayer(telegramUserId, username);
-        await this.playerService.recordPlayerAnswer((game.question as any)._id as string, (player as any)._id as string, 1);
-      };
-    }
 
     return isCorrect;
   }
@@ -113,21 +104,82 @@ export class GameService {
         score = difficultyNum;
         break;
       case GAME_STAGE.CLUE_1:
-        score = Math.max(1, Math.floor(difficultyNum / 2));
+        score = Math.max(0.2, difficultyNum / 2);
         break;
       case GAME_STAGE.CLUE_2:
-        score = Math.max(1, Math.floor(difficultyNum / 4));
+        score = Math.max(0.1, difficultyNum / 4);
         break;
     }
-    return score;
+
+    return parseFloat(score.toFixed(2));
   }
 
-  async endCurrentGame(chatId: number, telegramMessageThreadId: number | undefined): Promise<void> {
-    await this.gameTimerService.stopTimer(chatId, telegramMessageThreadId);
+  async endCurrentGame(telegramChatId: number, telegramMessageThreadId: number | undefined, questionId: string, score: number, playerId: string | null): Promise<void> {
 
-    // Remove ongoing game record entirely
+    await this.gameTimerService.stopTimer(telegramChatId, telegramMessageThreadId);
+
+    // removing ongoing game from the list
     await this.gameModel.deleteOne(
-      { telegramChatId: chatId, telegramMessageThreadId: telegramMessageThreadId }
+      { telegramChatId: telegramChatId, telegramMessageThreadId: telegramMessageThreadId }
     ).exec();
+
+    await this.questionService.saveHistoryQuestion(questionId, score, playerId);
+  }
+
+
+  public async advanceGame(chatId: number, telegramMessageThreadId: number | undefined, newStage: GAME_STAGE): Promise<QuestionDocument | null> {
+    try {
+      const game = await this.gameModel
+        .findOne({
+          telegramChatId: chatId,
+          telegramMessageThreadId: telegramMessageThreadId,
+          isDeleted: false
+        })
+        .populate('question')
+        .exec();
+
+      if (!game) {
+        this.logger.log(`Game ${chatId}_${telegramMessageThreadId} not found, may have been ended already`);
+        return null;
+      }
+
+      const question = game.question as QuestionDocument;
+      const clue = this.questionService.generateClue(question, newStage);
+
+      await this.gameModel.updateOne(
+        { telegramChatId: chatId, telegramMessageThreadId: telegramMessageThreadId },
+        {
+          $set: {
+            stage: newStage,
+            clue,
+            lastClueAt: new Date()
+          }
+        }
+      );
+
+      this.logger.log(`Advancing game ${chatId}_${telegramMessageThreadId} to ${newStage}`);
+
+      const questionMessage = this.telegramService.renderQuestionMessage(question.question, clue, question.difficulty, question.category, question.answer);
+      await this.telegramService.sendMessage(chatId, telegramMessageThreadId, questionMessage);
+      return question;
+
+    } catch (error) {
+      this.logger.error(`Error advancing game ${chatId}_${telegramMessageThreadId}:`, error);
+      return null;
+    }
+  }
+
+  public async revealAnswer(chatId: number, telegramMessageThreadId: number | undefined, question: QuestionDocument): Promise<void> {
+    const game = await this.gameModel
+      .findOne({ telegramChatId: chatId, telegramMessageThreadId: telegramMessageThreadId, isDeleted: false })
+      .populate('question')
+      .exec();
+    if (!game) {
+      this.logger.log(`Game ${chatId}_${telegramMessageThreadId} not found for revealing`);
+      return;
+    }
+
+    this.logger.log(`Revealed answer for game ${chatId}_${telegramMessageThreadId}`);
+    await this.telegramService.revealAnswer(chatId, telegramMessageThreadId, question as QuestionDocument);
   }
 }

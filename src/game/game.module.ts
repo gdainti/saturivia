@@ -6,10 +6,14 @@ import { Game, GameSchema } from 'src/game/game.schema';
 import { QuestionModule } from 'src/question/question.module';
 import { PlayerModule } from 'src/player/player.module';
 import { TelegramModule } from 'src/telegram/telegram.module';
+import { QuestionHistory, QuestionHistorySchema } from 'src/question/question-history.schema';
 
 @Module({
   imports: [
-    MongooseModule.forFeature([{ name: Game.name, schema: GameSchema }]),
+    MongooseModule.forFeature([
+      { name: Game.name, schema: GameSchema },
+      { name: QuestionHistory.name, schema: QuestionHistorySchema }
+    ]),
     QuestionModule,
     PlayerModule,
     forwardRef(() => TelegramModule),

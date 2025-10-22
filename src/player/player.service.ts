@@ -15,28 +15,13 @@ export class PlayerService {
 	constructor(
 		@InjectModel(Player.name) private playerModel: Model<PlayerDocument>,
 		@InjectModel(QuestionHistory.name) private questionHistoryModel: Model<QuestionHistoryDocument>,
-	) {}
+	) { }
 
 	async findOrCreatePlayer(telegramId: number, username?: string) {
 		const existing = await this.playerModel.findOne({ telegramId }).exec();
 		if (existing) return existing;
 		const created = await this.playerModel.create({ telegramId, username });
 		return created;
-	}
-
-	async recordPlayerAnswer(questionId: string, playerId: string, score = 1): Promise<UpsertAnswerResult> {
-		try {
-			const res = await this.questionHistoryModel.findOneAndUpdate(
-				{ questionId, playerId },
-				{ $inc: { score }, $setOnInsert: { isDeleted: false } },
-				{ upsert: true, new: true, setDefaultsOnInsert: true }
-			).exec();
-
-			return { created: true, score: (res as any).score };
-		} catch (err) {
-			this.logger.error('Failed to record player answer', err);
-			throw err;
-		}
 	}
 
 	async getTopPlayers(limit = 5) {
@@ -64,7 +49,7 @@ export class PlayerService {
 	async recordUnansweredQuestion(questionId: string): Promise<QuestionHistory> {
 		try {
 			const questionHistory = await this.questionHistoryModel.create({
-				questionId,
+				question: questionId,
 				playerId: null,
 				score: 0,
 				isDeleted: false
@@ -105,7 +90,7 @@ export class PlayerService {
 
 	async getQuestionStats(questionId: string) {
 		const pipeline = [
-			{ $match: { questionId, isDeleted: false } },
+			{ $match: { question: questionId, isDeleted: false } },
 			{
 				$group: {
 					_id: { answered: { $ne: ['$playerId', null] } },

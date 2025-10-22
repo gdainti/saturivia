@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Document, Types } from 'mongoose';
 import { QUESTION_TYPE } from 'src/question/question-type';
 
 export type QuestionDocument = Question & Document;

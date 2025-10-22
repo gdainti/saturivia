@@ -1,17 +1,56 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy, Inject, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Telegraf } from 'telegraf';
+import { Context, Telegraf } from 'telegraf';
 import { QuestionService } from 'src/question/question.service';
 import { PlayerService } from 'src/player/player.service';
 import { GameService } from 'src/game/game.service';
 import { Game } from 'src/game/game.schema';
 import { QUESTION_TYPE } from 'src/question/question-type';
+import { ReactionType } from 'telegraf/types';
+import { QuestionDocument } from 'src/question/question.schema';
+
+// Possible reaction emojis:
+// "👍" | "👎" | "❤" | "🔥" | "🥰" | "👏" | "😁" | "🤔" | "🤯" |
+//  "😱" | "🤬" | "😢" | "🎉" | "🤩" | "🤮" | "💩" | "🙏" | "👌" |
+// "🕊" | "🤡" | "🥱" | "🥴" | "😍" | "🐳" | "❤‍🔥" | "🌚" | "🌭" |
+// "💯" | "🤣" | "⚡" | "🍌" | "🏆" | "💔" | "🤨" | "😐" | "🍓" |
+// "🍾" | "💋" | "🖕" | "😈" | "😴" | "😭" | "🤓" | "👻" | "👨‍💻" |
+// "👀" | "🎃" | "🙈" | "😇" | "😨" | "🤝" | "✍" | "🤗" | "🫡" |
+// "🎅" | "🎄" | "☃" | "💅" | "🤪" | "🗿" | "🆒" | "💘" | "🙉" |
+// "🦄" | "😘" | "💊" | "🙊" | "😎" | "👾" | "🤷‍♂" | "🤷" | "🤷‍♀" |
+// "😡";
+
+const WRONG_ANSWER_REACTIONS: ReactionType[] = [
+  { type: 'emoji', emoji: '🤔' },
+  { type: 'emoji', emoji: '😢' },
+  { type: 'emoji', emoji: '🤷‍♂' },
+  { type: 'emoji', emoji: '🤷' },
+  { type: 'emoji', emoji: '🤷‍♀' },
+  { type: 'emoji', emoji: '🤯' },
+  { type: 'emoji', emoji: '🥴' },
+  { type: 'emoji', emoji: '🙈' },
+  { type: 'emoji', emoji: '🙊' },
+  { type: 'emoji', emoji: '🗿' },
+  { type: 'emoji', emoji: '😨' },
+];
+
+const CORRECT_ANSWER_REACTIONS: ReactionType[] = [
+  { type: 'emoji', emoji: '🎉' },
+  { type: 'emoji', emoji: '🏆' },
+  { type: 'emoji', emoji: '🔥' },
+  { type: 'emoji', emoji: '👏' },
+  { type: 'emoji', emoji: '🍾' },
+  { type: 'emoji', emoji: '💘' },
+  { type: 'emoji', emoji: '😎' },
+  { type: 'emoji', emoji: '🤝' },
+];
 
 interface BotCommand {
   command: string;
   description: string;
   action: (ctx: any) => Promise<void>;
 }
+
 @Injectable()
 export class TelegramService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(TelegramService.name);
@@ -29,20 +68,20 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       command: 'help',
       description: 'How to play',
       action: async (ctx) => {
-        await ctx.reply('Help information here');
+        await this.reply(ctx, 'Help information here');
       }
     },
     {
       command: 'scoreboard',
       description: 'View top score',
       action: async (ctx) => {
-        const top = await this.playerService.getTopPlayers(5);
+        const top = await this.playerService.getTopPlayers(10);
         if (!top || top.length === 0) {
-          await ctx.reply('No scores yet. Play some games!');
+          await this.reply(ctx, 'No scores yet. Play some games!');
           return;
         }
-        const lines = top.map((t, i) => `${i + 1}. ${t.username ?? t.telegramId} — ${t.totalScore}`);
-        await ctx.reply(['Top players:', ...lines].join('\n'));
+        const lines = top.map((t, i) => `${i + 1}. ${t.username ?? t.telegramId} — <b>${t.totalScore}</b>`);
+        await this.reply(ctx, ['Top players🏆\n', ...lines].join('\n'));
       }
     },
     {
@@ -67,7 +106,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
         if (!game) {
           game = await this.gameService.startNewGame(chatId, telegramMessageThreadId);
           if (!game || !game.question?.question || !game.question?.answer) {
-            await ctx.reply('Error: could not start a new game.');
+            await this.reply(ctx, 'Error: could not start a new game.');
             return;
           }
         }
@@ -75,12 +114,14 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
         const question = game.question.question;
         const answer = game.question.answer;
 
-        await ctx.reply(
+        await this.reply(
+          ctx,
           this.renderQuestionMessage(
             question,
-            answer,
+            this.questionService.generateClue(game.question as QuestionDocument, game.stage),
             game.question.difficulty,
             game.question.category,
+            game.question.answer
           ),
         );
       }
@@ -117,12 +158,11 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     const isDM = type === 'private';
     const isGroup = type === 'group' || type === 'supergroup';
     const isChannel = type === 'channel';
-    // forum threads in supergroups include message_thread_id on the message
     const isThread = Boolean(ctx.message?.message_thread_id || ctx.message_thread_id);
     return { type, isDM, isGroup, isChannel, isThread };
   }
 
-  private renderQuestionMessage(question: string, answer: string, difficulty: string | number, category?: string): string {
+  public renderQuestionMessage(question: string, hint: string, difficulty: string | number, category?: string, debug?: string): string {
     let message = `${question}\n---\n`;
     if (category) {
       message += `category: ${category}\n`;
@@ -131,31 +171,37 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       message += `difficulty: ${difficulty}\n`;
     }
 
-    const wordCount = answer.trim().split(/\s+/).filter(word => word.length > 0).length;
+    const wordCount = hint.trim().split(/\s+/).filter(word => word.length > 0).length;
     if (wordCount > 1) {
       message += `words: ${wordCount}\n`;
     }
 
-    const charCount = answer.replace(/\s/g, '').length;
-
-    // move masking out of this function [hints will also be here]
-
-    const questionMask = answer.replace(/[\p{L}\p{N}]/gu, '*');
-    message += `hint: ${questionMask} [${charCount}]\n`;
+    const charCount = hint.replace(/\s/g, '').length;
+    message += `hint: ${hint} [${charCount}]\n`;
 
     const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
-    if (!isProduction) {
-      message += `debug: ${answer}\n`;
+    if (!isProduction && debug) {
+      message += `debug: ${debug}\n`;
     }
 
     return message;
   }
 
-  private async init() {
-
+  private async stopBot() {
     if (this.bot) {
       await this.bot.stop('SIGINT');
       await this.bot.stop('SIGTERM');
+    }
+  }
+
+  public async revealAnswer(chatId: number, telegramMessageThreadId: number | undefined, question: QuestionDocument): Promise<void> {
+    await this.sendMessage(chatId, telegramMessageThreadId, `Answer: ${question.answer}\n${this.getPlayAgainLink(question.type)}`);
+  }
+
+  private async init() {
+
+    if (this.bot) {
+      await this.stopBot();
     }
 
     const token =
@@ -179,12 +225,12 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       .catch((err) => this.logger.error('Failed to launch Telegram bot', err));
   }
 
-  private getPlayAgainLink(type: QUESTION_TYPE): string {
+  private getPlayAgainLink(type: string): string {
     if (!type || !this.bot?.botInfo?.username) {
       return '';
     }
 
-    return `/${type}@${this.bot?.botInfo?.username}`;
+    return `\n🔄 /${type}@${this.bot?.botInfo?.username}`;
   }
 
   private setBotTextActions() {
@@ -195,7 +241,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     }
 
     this.bot.start(async (ctx) => {
-      await ctx.reply('Welcome to Saturivia! Have fun!');
+      await this.reply(ctx, 'Welcome to Saturivia! Have fun!');
     });
 
     this.bot.on('message', async (ctx, next) => {
@@ -209,12 +255,13 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       }
 
       const text = (ctx.message as any).text as string;
-      const { isDM } = this.getChatKind(ctx);
+      const { isDM, type, isThread } = this.getChatKind(ctx);
 
       //this.logger.debug(`Incoming text from chat ${chatId} type=${type} thread=${isThread}`);
       //this.logger.debug(`Text: ${text}`);
 
-      if (!chatId || !ctx.from || !text || text.startsWith('/') || isDM || ctx.from.is_bot) {
+      const isBot = ctx.from?.is_bot && ctx.from.username !== 'GroupAnonymousBot';
+      if (!chatId || !ctx.from || !text || text.startsWith('/') || isDM || isBot) {
         await next();
         return;
       }
@@ -230,42 +277,42 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
           chatId,
           telegramMessageThreadId,
           text,
-          ctx.from.id,
-          ctx.from.username
+          game
         );
 
         const correctAnswer = game?.question?.answer;
 
         if (isCorrect) {
           const score = this.gameService.getScoreFromStage(game.question.difficulty, game.stage);
-          await ctx.reply(`🎉 Correct! Answer: ${correctAnswer}.\nScore: +${score}\n`);
-          await this.gameService.endCurrentGame(chatId, telegramMessageThreadId);
+          const randomReaction = CORRECT_ANSWER_REACTIONS[Math.floor(Math.random() * CORRECT_ANSWER_REACTIONS.length)];
+          this.bot?.telegram.setMessageReaction(chatId, ctx.message.message_id, [randomReaction]);
+          const mentionUser = this.mentionUserByTelegramId(ctx.from.id, ctx.from.username);
+          await this.reply(ctx, `Correct ${randomReaction}! ${correctAnswer}.\n---\n${mentionUser}: +${score} points\n${this.getPlayAgainLink(game.question.type)}`);
+          const player = await this.playerService.findOrCreatePlayer(ctx.from.id, ctx.from.username);
+          await this.gameService.endCurrentGame(
+            chatId,
+            telegramMessageThreadId,
+            String((game.question as QuestionDocument)._id),
+            score,
+            String(player._id),
+          );
         } else {
-          try {
-            // react to the message does not work; commenting out for now
-
-            /* const givenLen = String(text).trim().length;
-            const answerLen = String(correctAnswer).trim().length;
-            if (givenLen > 0 && givenLen === answerLen) {
-              const msgId = (ctx.message as any).message_thread_id;
-              try {
-                if (this.bot && this.bot.telegram && typeof this.bot.telegram.setMessageReaction === 'function') {
-                  await this.bot.telegram.setMessageReaction(chatId, msgId, [({ type: 'emoji', emoji: '❌' } as any)], false);
-                }
-              } catch (err) {
-                this.logger.warn('Failed to set message reaction', err);
-              }
-            } else {
-              // ignore messages that are not the same length as the answer
-            } */
-          } catch (err) {
-            this.logger.warn('Failed to react to message', err);
-          }
+          const randomReaction = WRONG_ANSWER_REACTIONS[Math.floor(Math.random() * WRONG_ANSWER_REACTIONS.length)];
+          this.bot?.telegram.setMessageReaction(chatId, ctx.message.message_id, [randomReaction]);
         }
       } catch (err) {
         this.logger.error('Error processing text message', err);
       }
     });
+  }
+
+  public mentionUserByTelegramId(id: string | number, name: string | undefined) {
+    if (!id) {
+      return name || 'Player';
+    }
+
+    const mention = id.toString().startsWith('@') ? id : `<a href="tg://user?id=${id}">${name}</a>`;
+    return `${mention}`;
   }
 
   private async setBotCommands() {
@@ -291,7 +338,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
   async onModuleDestroy() {
     if (this.bot) {
       try {
-        await this.bot.stop();
+        await this.stopBot();
         this.logger.log('Telegram bot stopped');
       } catch (err) {
         const msg = err && (err as any).message ? String((err as any).message) : '';
@@ -304,12 +351,21 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  private getDefaultExtra() {
+    return ({
+      parse_mode: 'HTML' as import('telegraf/types').ParseMode,
+    });
+  }
+
+  private async reply(ctx: Context, text: string): Promise<void> {
+    const extra = this.getDefaultExtra();
+    await ctx.reply(text, extra);
+  }
+
   async sendMessage(chatId: number, telegramMessageThreadId: number | undefined, text: string): Promise<void> {
     if (this.bot) {
 
-      const extra = {
-        parse_mode: 'HTML' as import('telegraf/types').ParseMode,
-      }
+      const extra = this.getDefaultExtra();
 
       if (telegramMessageThreadId) {
         extra['reply_to_message_id'] = telegramMessageThreadId;
