@@ -87,12 +87,18 @@ export class GameService {
     const correctAnswer = (game.question as any).answer as string;
     if (!correctAnswer) return false;
 
-    const normalizedGiven = givenAnswer.trim().toLowerCase();
-    const normalizedCorrect = correctAnswer.trim().toLowerCase();
+    const normalize = (input: string) => {
+      let s = input.trim();
+      // strip surrounding quotes including ASCII and Unicode variants
+      s = s.replace(/^["'“”«»〞⹂]+|["'“”«»〞⹂]+$/g, '');
+      // remove trailing punctuation like ., !, ?
+      s = s.replace(/[.!?]+$/g, '');
+      return s.trim().toLowerCase();
+    };
 
-    const isCorrect = normalizedCorrect.includes(normalizedGiven) || normalizedGiven.includes(normalizedCorrect) || normalizedGiven === normalizedCorrect;
-
-    return isCorrect;
+    const nGiven = normalize(givenAnswer);
+    const nCorrect = normalize(correctAnswer);
+    return nGiven === nCorrect;
   }
 
   public getScoreFromStage(difficulty: string | number, stage: GAME_STAGE): number {

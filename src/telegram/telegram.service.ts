@@ -238,7 +238,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     if (!type || !this.bot?.botInfo?.username) {
       return '';
     }
-    return `\n🔄play again /${type}@${this.bot?.botInfo?.username}`;
+    return `\n🔄play again: /${type}@${this.bot?.botInfo?.username}`;
   }
 
   private setBotTextActions() {
