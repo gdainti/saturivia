@@ -42,9 +42,9 @@ export class QuestionHistory {
 export const QuestionHistorySchema = SchemaFactory.createForClass(QuestionHistory);
 
 QuestionHistorySchema.index({ question: 1, playerId: 1 }, {
-  unique: true,
+  unique: false,
   sparse: true,
-  name: 'question_playerId_unique',
+  name: 'question_playerId_non_unique',
 });
 
 QuestionHistorySchema.index({ question: 1, createdAt: 1 }, { name: 'question_createdAt' });

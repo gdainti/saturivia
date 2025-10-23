@@ -80,32 +80,32 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
       }
     },
     {
-      command: 'leaderboard',
-      description: 'View top score',
-      action: async (ctx) => {
-        const top = await this.playerService.getTopPlayers(10);
-        if (!top || top.length === 0) {
-          await this.reply(ctx, '🫙 No scores yet. Play some games!');
-          return;
-        }
-        const lines = top.map((t, i) => `${i + 1}. ${t.username ?? t.telegramId} — <b>${t.totalScore}</b>`);
-        await this.reply(ctx, ['Top players🏆\n', ...lines].join('\n'));
-      }
-    },
-    {
       command: 'stats',
-      description: 'View stats',
+      description: 'View game statistics',
       action: async (ctx) => {
+
         const totalQuestions = await this.questionService.getTotalQuestions();
         const totalPlayers = await this.playerService.getTotalPlayers();
         const totalGames = await this.questionService.getTotalHistoryQuestions();
 
-        let message = '📊Stats\n\n';
-        message += `- Total Questions: ${totalQuestions}\n`;
-        message += `- Questions played: ${totalGames}\n`;
-        message += `- Total winners: ${totalPlayers}\n`;
+        let statsMessage = '📊Stats\n\n';
+        statsMessage += `- Total Questions: <b>${totalQuestions}</b>\n`;
+        statsMessage += `- Questions played: <b>${totalGames}</b>\n`;
+        statsMessage += `- Total players: <b>${totalPlayers}</b>\n`;
 
-        await this.reply(ctx, message);
+        const top = await this.playerService.getTopPlayers(10);
+        let topPlayersMessage = '';
+
+        console.log(top);
+        if (!top || top.length === 0) {
+          topPlayersMessage += '🫙 No scores yet. Play some games!';
+        } else {
+          const lines = top.map((t, i) => `${i + 1}. ${t.username ?? t.telegramId} — <b>${t.totalScore}</b>`);
+          topPlayersMessage += '🏆 Top Players:\n';
+          topPlayersMessage += lines.join('\n');
+        }
+
+        await this.reply(ctx, `${statsMessage}\n---\n\n${topPlayersMessage}`);
       }
     },
     {
@@ -127,12 +127,15 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
           this.logger.error('Error checking existing game', err);
         }
 
-        if (!game) {
-          game = await this.gameService.startNewGame(chatId, telegramMessageThreadId, QUESTION_TYPE.TRIVIA);
-          if (!game || !game.question?.question || !game.question?.answer) {
-            await this.reply(ctx, '❌ Error: could not start a new game.');
-            return;
-          }
+        if (game) {
+          // ongoing game exists
+          return;
+        }
+
+        game = await this.gameService.startNewGame(chatId, telegramMessageThreadId, QUESTION_TYPE.TRIVIA);
+        if (!game || !game.question?.question || !game.question?.answer) {
+          await this.reply(ctx, '❌ Error: could not start a new game.');
+          return;
         }
 
         const question = game.question.question;
@@ -197,24 +200,63 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
     return filled + empty;
   }
 
-  public renderQuestionMessage(question: string, hint: string, difficulty: string | number, category?: string, debug?: string): string {
-    let message = `❔ <b>${question}</b>\n\n`;
 
-    const charCount = hint.replace(/\s/g, '').length;
-    message += `💡 <b>${hint}</b> [${charCount}]\n`;
-    message += '\n---\n';
+  public renderQuestion(question: string): string {
+    const replacements: { [key: string]: string } = {
+      'а': 'a',
+      'е': 'e',
+      'о': 'o',
+      'с': 'c',
+      'р': 'p',
+    };
 
-    if (difficulty) {
+    let normalizedQuestion = question;
+
+    for (const cyrillicChar in replacements) {
+      if (replacements.hasOwnProperty(cyrillicChar)) {
+        const latinChar = replacements[cyrillicChar];
+
+        const regex = new RegExp(cyrillicChar, 'gi');
+
+        normalizedQuestion = normalizedQuestion.replace(regex, (match) => {
+          if (match === cyrillicChar.toUpperCase()) {
+            return latinChar.toUpperCase();
+          }
+          return latinChar.toLowerCase();
+        });
+      }
+    }
+
+    return `❔<b>${normalizedQuestion}</b>\n\n`;
+  }
+
+  public renderClue(hint: string): string {
+    const words = hint.split(/\s+/).filter(Boolean);
+    const lengths = words.map(word => word.length);
+    const lengthsString = lengths.join(' ');
+    return `💡 <b>${hint}</b> <code>[${lengthsString}]</code>\n`;
+  }
+
+  public renderQuestionMessage(question: string, hint: string, difficulty: number, category?: string, debug?: string): string {
+
+    let message = this.renderQuestion(question);
+
+    message += this.renderClue(hint);
+
+    const isDifficulty = difficulty && !isNaN(difficulty) && difficulty > 1;
+    const isCategory = category && category.trim().length > 0;
+
+    if (isDifficulty || isCategory) {
+      message += '\n---\n';
+    }
+
+    if (isDifficulty) {
       message += `difficulty: ${this.renderDifficulty(difficulty)}\n`;
     }
 
-    message += `category: ${category || '-'}\n`;
-
-    const wordCount = hint.trim().split(/\s+/).filter(word => word.length > 0).length;
-    if (wordCount > 1) {
-      message += `words: ${wordCount}\n`;
+    if (isCategory) {
+      message += `category: ${category || '-'}\n`;
     }
-
 
     const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
     if (!isProduction && debug) {
@@ -234,7 +276,13 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
   }
 
   public async revealAnswer(chatId: number, telegramMessageThreadId: number | undefined, question: QuestionDocument): Promise<void> {
-    await this.sendMessage(chatId, telegramMessageThreadId, `❄️Answer: <i>${question.answer}</i>\n${this.getPlayAgainLink(question.type)}`);
+    const randomReaction = WRONG_ANSWER_REACTIONS[Math.floor(Math.random() * CORRECT_ANSWER_REACTIONS.length)];
+    const randomWrongEmoji = (randomReaction as { emoji: string }).emoji;
+    await this.sendMessage(
+      chatId,
+      telegramMessageThreadId,
+      `${randomWrongEmoji || '❄️'}Answer: <i>${question.answer}</i>\n${this.getPlayAgainLink(question.type)}`
+    );
   }
 
   private async init() {

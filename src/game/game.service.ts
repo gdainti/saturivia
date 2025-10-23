@@ -171,7 +171,7 @@ export class GameService {
 
       this.logger.log(`Advancing game ${chatId}_${telegramMessageThreadId} to ${newStage}`);
 
-      const questionMessage = this.telegramService.renderQuestionMessage(question.question, clue, question.difficulty, question.category, question.answer);
+      const questionMessage = this.telegramService.renderClue(clue);
       await this.telegramService.sendMessage(chatId, telegramMessageThreadId, questionMessage);
       return question;
 
