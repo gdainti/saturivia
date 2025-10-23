@@ -16,36 +16,6 @@ export class QuestionService {
     @InjectModel(QuestionHistory.name) private questionHistoryModel: Model<QuestionHistoryDocument>,
   ) { }
 
-
-  // TODO remove this method after deployment
-  async onModuleInit() {
-    console.log("Checking for and dropping 'question_playerId_unique' index...");
-    await this.dropUniqueQuestionPlayerIndex();
-  }
-
-  // helper method to drop the problematic unique index
-  private async dropUniqueQuestionPlayerIndex(): Promise<void> {
-    const indexName = 'question_playerId_unique';
-
-    try {
-      const indexes = await this.questionHistoryModel.collection.getIndexes();
-
-      if (indexes[indexName]) {
-        console.log(`Found problematic index: ${indexName}. Dropping now...`);
-        await this.questionHistoryModel.collection.dropIndex(indexName);
-        console.log(`Successfully dropped index: ${indexName}.`);
-      } else {
-        console.log(`Index ${indexName} not found. Skipping drop.`);
-      }
-    } catch (error) {
-      if (error.codeName === 'IndexNotFound') {
-        console.log(`Index ${indexName} was already gone.`);
-      } else {
-        console.error(`Error dropping index ${indexName}:`, error.message);
-      }
-    }
-  }
-
   async getRandomQuestion(type: QUESTION_TYPE): Promise<Question> {
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 

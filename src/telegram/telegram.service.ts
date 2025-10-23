@@ -242,12 +242,13 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
     let message = this.renderQuestion(question);
 
     message += this.renderClue(hint);
+    message += '\n';
 
     const isDifficulty = difficulty && !isNaN(difficulty) && difficulty > 1;
     const isCategory = category && category.trim().length > 0;
 
     if (isDifficulty || isCategory) {
-      message += '\n---\n';
+      message += '---\n';
     }
 
     if (isDifficulty) {
@@ -281,7 +282,7 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
     await this.sendMessage(
       chatId,
       telegramMessageThreadId,
-      `${randomWrongEmoji || '❄️'}Answer: <i>${question.answer}</i>\n${this.getPlayAgainLink(question.type)}`
+      `${randomWrongEmoji || '❄️'}Answer: <i>${question.answer}</i>\n${this.getPlayAgainLink(question.type)}\n\n`
     );
   }
 
