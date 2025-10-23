@@ -2,7 +2,7 @@
 
 export DOCKER_CONTENT_TRUST=0
 export IMAGE="ghcr.io/gdainti/saturivia/saturivia"
-export TAG="main"
+export TAG="latest"
 
 echo "Pulling latest image: ${IMAGE}:${TAG}"
 docker pull ${IMAGE}:${TAG}
