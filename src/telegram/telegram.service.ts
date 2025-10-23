@@ -98,7 +98,7 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
       action: async (ctx) => {
         const totalQuestions = await this.questionService.getTotalQuestions();
         const totalPlayers = await this.playerService.getTotalPlayers();
-        const totalGames = await this.gameService.getTotalGames();
+        const totalGames = await this.questionService.getTotalHistoryQuestions();
 
         let message = '📊Stats\n\n';
         message += `- Total Questions: ${totalQuestions}\n`;

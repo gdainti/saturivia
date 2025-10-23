@@ -156,4 +156,8 @@ export class QuestionService {
   public async getTotalQuestions(): Promise<number> {
     return this.questionModel.countDocuments({ isDeleted: false }).exec();
   }
+
+  public async getTotalHistoryQuestions(): Promise<number> {
+    return this.questionHistoryModel.countDocuments().exec();
+  }
 }
