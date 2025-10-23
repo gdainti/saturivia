@@ -68,7 +68,7 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
       command: 'help',
       description: 'How to play',
       action: async (ctx) => {
-        await this.reply(ctx, '🚧 Help information here');
+        await this.reply(ctx, `🚧 Help information under construction\n ${this.getJoinLinkMessage()}`);
       }
     },
     {
@@ -151,6 +151,10 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
       }
     }
   ];
+
+  private getJoinLinkMessage(): string {
+    return `join <a href="https://t.me/+9sGPFwfhKmFjYmQy">Saturivia chat🪐</a> to play`;
+  }
 
   onApplicationBootstrap() {
     try {
@@ -259,7 +263,7 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
     }
 
     this.bot.start(async (ctx) => {
-      await this.reply(ctx, 'Welcome to Saturivia🪐! Have fun!');
+      await this.reply(ctx, `Welcome to Saturivia🪐!\n ${this.getJoinLinkMessage()}`);
     });
 
     this.bot.on('message', async (ctx, next) => {
