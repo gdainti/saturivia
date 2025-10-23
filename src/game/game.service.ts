@@ -88,12 +88,14 @@ export class GameService {
     if (!correctAnswer) return false;
 
     const normalize = (input: string) => {
-      let s = input.trim();
+      let s = input.trim().toLowerCase();
       // strip surrounding quotes including ASCII and Unicode variants
       s = s.replace(/^["'“”«»〞⹂]+|["'“”«»〞⹂]+$/g, '');
       // remove trailing punctuation like ., !, ?
       s = s.replace(/[.!?]+$/g, '');
-      return s.trim().toLowerCase();
+        // treat Cyrillic 'ё' and 'Ё' as 'е'
+        s = s.replace(/ё/gi, 'е');
+      return s.trim();
     };
 
     const nGiven = normalize(givenAnswer);

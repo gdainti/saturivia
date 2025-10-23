@@ -73,6 +73,15 @@ describe('GameService', () => {
       expect(result).toBe(false);
     });
 
+    it('treats Cyrillic ё and е as equal', async () => {
+      // correct contains ё, given with е
+      const test1 = await service.checkAnswer(chatId, threadId, 'елка', makeGame('ёлка'));
+      expect(test1).toBe(true);
+      // correct contains е, given with ё
+      const test2 = await service.checkAnswer(chatId, threadId, 'ёлка', makeGame('елка'));
+      expect(test2).toBe(true);
+    });
+
     it('throws NotFoundException if no game provided', async () => {
       await expect(service.checkAnswer(chatId, threadId, 'x', null as any)).rejects.toThrow('No active game found');
     });
