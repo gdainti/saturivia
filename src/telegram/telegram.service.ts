@@ -325,7 +325,7 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
           const randomReaction = CORRECT_ANSWER_REACTIONS[Math.floor(Math.random() * CORRECT_ANSWER_REACTIONS.length)];
           this.bot?.telegram.setMessageReaction(chatId, ctx.message.message_id, [randomReaction]);
           const mentionUser = this.mentionUserByTelegramId(ctx.from.id, ctx.from.username);
-          await this.reply(ctx, `${(randomReaction as {emoji: string }).emoji} <i>${correctAnswer}</i>\n\n---\n${mentionUser}: +${score} points\n${this.getPlayAgainLink(game.question.type)}`);
+          await this.reply(ctx, `${(randomReaction as { emoji: string }).emoji} <i>${correctAnswer}</i>\n\n---\n${mentionUser}: +${score} points\n${this.getPlayAgainLink(game.question.type)}`);
           const player = await this.playerService.findOrCreatePlayer(ctx.from.id, ctx.from.username);
           await this.gameService.endCurrentGame(
             chatId,
@@ -336,8 +336,10 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
           );
           // TODO show scoreboard if player entered scoreboard
         } else {
-          const randomReaction = WRONG_ANSWER_REACTIONS[Math.floor(Math.random() * WRONG_ANSWER_REACTIONS.length)];
-          this.bot?.telegram.setMessageReaction(chatId, ctx.message.message_id, [randomReaction]);
+          if (correctAnswer.length === text.length) {
+            const randomReaction = WRONG_ANSWER_REACTIONS[Math.floor(Math.random() * WRONG_ANSWER_REACTIONS.length)];
+            this.bot?.telegram.setMessageReaction(chatId, ctx.message.message_id, [randomReaction]);
+          }
         }
       } catch (err) {
         this.logger.error('Error processing text message', err);
