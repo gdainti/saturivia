@@ -45,6 +45,8 @@ const CORRECT_ANSWER_REACTIONS: ReactionType[] = [
   { type: 'emoji', emoji: '🤝' },
 ];
 
+const REPLY_MESSAGE = 'To submit your answer: reply or mention the bot or start your message with "="';
+
 interface BotCommand {
   command: string;
   description: string;
@@ -68,7 +70,14 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
       command: 'help',
       description: 'How to play',
       action: async (ctx) => {
-        await this.reply(ctx, `🚧 Help information under construction\n ${this.getJoinLinkMessage()}`);
+        let helpMessage = `🤖<b>${this.bot?.botInfo?.username || 'Saturivia'} Bot Help</b> 🪐\n\n`;
+
+        helpMessage += `Trigger /${QUESTION_TYPE.TRIVIA} command to start a ${QUESTION_TYPE.TRIVIA} question` + '\n';
+        helpMessage += REPLY_MESSAGE + '\n';
+        helpMessage += 'Answering wrong or after clues reduces your gained score' + '\n';
+        helpMessage += '\n' + this.getJoinLinkMessage();
+
+        await this.reply(ctx, helpMessage);
       }
     },
     {
@@ -164,7 +173,7 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
           return;
         }
 
-        await ctx.reply('🚧 CHGK questions are in development and will be available soon!');
+        await ctx.reply('🚧 CHGK questions are in development');
 
       }
     }
@@ -425,7 +434,7 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
         );
 
         if (isCorrectMessageText && !text) {
-          await this.reply(ctx, '🚫Please reply directly to bot or start your answer with "=" to submit your answer');
+          await this.reply(ctx, `🚫${REPLY_MESSAGE}`);
           return;
         }
 
