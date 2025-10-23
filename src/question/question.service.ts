@@ -152,4 +152,8 @@ export class QuestionService {
   async create(questionData: Partial<Question>): Promise<Question> {
     return this.questionModel.create(questionData);
   }
+
+  public async getTotalQuestions(): Promise<number> {
+    return this.questionModel.countDocuments({ isDeleted: false }).exec();
+  }
 }

@@ -119,4 +119,8 @@ export class PlayerService {
 			answerRate: answered + unanswered > 0 ? (answered / (answered + unanswered)) * 100 : 0
 		};
 	}
+
+	public async getTotalPlayers(): Promise<number> {
+		return this.playerModel.countDocuments({ isDeleted: false }).exec();
+	}
 }

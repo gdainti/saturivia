@@ -80,7 +80,7 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
       }
     },
     {
-      command: 'scoreboard',
+      command: 'leaderboard',
       description: 'View top score',
       action: async (ctx) => {
         const top = await this.playerService.getTopPlayers(10);
@@ -90,6 +90,22 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
         }
         const lines = top.map((t, i) => `${i + 1}. ${t.username ?? t.telegramId} — <b>${t.totalScore}</b>`);
         await this.reply(ctx, ['Top players🏆\n', ...lines].join('\n'));
+      }
+    },
+    {
+      command: 'stats',
+      description: 'View stats',
+      action: async (ctx) => {
+        const totalQuestions = await this.questionService.getTotalQuestions();
+        const totalPlayers = await this.playerService.getTotalPlayers();
+        const totalGames = await this.gameService.getTotalGames();
+
+        let message = '📊Stats\n\n';
+        message += `- Total Questions: ${totalQuestions}\n`;
+        message += `- Questions played: ${totalGames}\n`;
+        message += `- Total winners: ${totalPlayers}\n`;
+
+        await this.reply(ctx, message);
       }
     },
     {

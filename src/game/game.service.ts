@@ -135,6 +135,10 @@ export class GameService {
   }
 
 
+  public async getTotalGames(): Promise<number> {
+    return this.gameModel.countDocuments({ isDeleted: false }).exec();
+  }
+
   public async advanceGame(chatId: number, telegramMessageThreadId: number | undefined, newStage: GAME_STAGE): Promise<QuestionDocument | null> {
     try {
       const game = await this.gameModel
