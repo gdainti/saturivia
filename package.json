@@ -1,6 +1,6 @@
 {
   "name": "saturivia",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "telegram trivia bot",
   "author": "gdainti",
   "private": true,
@@ -18,6 +18,9 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
+    "patch": "npm version patch --no-git-tag-version",
+    "minor": "npm version minor --no-git-tag-version",
+    "major": "npm version major --no-git-tag-version",
     "seed": "node -r tsconfig-paths/register -r ts-node/register ./scripts/seed-questions.ts",
     "parse": "node -r tsconfig-paths/register -r ts-node/register ./scripts/parse-questions.ts"
   },
