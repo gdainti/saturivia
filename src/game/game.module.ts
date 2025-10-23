@@ -7,12 +7,14 @@ import { QuestionModule } from 'src/question/question.module';
 import { PlayerModule } from 'src/player/player.module';
 import { TelegramModule } from 'src/telegram/telegram.module';
 import { QuestionHistory, QuestionHistorySchema } from 'src/question/question-history.schema';
+import { IncorrectAnswer, IncorrectAnswerSchema } from 'src/question/incorrect-answer.schema';
 
 @Module({
   imports: [
     MongooseModule.forFeature([
       { name: Game.name, schema: GameSchema },
-      { name: QuestionHistory.name, schema: QuestionHistorySchema }
+      { name: QuestionHistory.name, schema: QuestionHistorySchema },
+      { name: IncorrectAnswer.name, schema: IncorrectAnswerSchema },
     ]),
     QuestionModule,
     PlayerModule,

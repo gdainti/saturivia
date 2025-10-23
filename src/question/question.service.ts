@@ -5,6 +5,7 @@ import { GAME_STAGE } from 'src/game/game.schema';
 import { Question, QuestionDocument } from 'src/question/question.schema';
 import { QuestionHistory, QuestionHistoryDocument } from './question-history.schema';
 import { QUESTION_TYPE } from './question-type';
+import { IncorrectAnswer, IncorrectAnswerDocument } from 'src/question/incorrect-answer.schema';
 
 export const MASK_CHARACTER = '●';
 @Injectable()
@@ -14,6 +15,7 @@ export class QuestionService {
   constructor(
     @InjectModel(Question.name) private questionModel: Model<QuestionDocument>,
     @InjectModel(QuestionHistory.name) private questionHistoryModel: Model<QuestionHistoryDocument>,
+    @InjectModel(IncorrectAnswer.name) private incorrectAnswerModel: Model<IncorrectAnswerDocument>,
   ) { }
 
   async getRandomQuestion(type: QUESTION_TYPE): Promise<Question> {
@@ -71,6 +73,32 @@ export class QuestionService {
       score: score
     });
     return historyEntry;
+  }
+
+  public async saveIncorrectAnswer(telegramChatId: number, telegramMessageThreadId: number | undefined, questionId: string, playerId: string, answer: string): Promise<IncorrectAnswer> {
+    const incorrectAnswerEntry = await this.incorrectAnswerModel.create({
+      telegramChatId: telegramChatId,
+      telegramMessageThreadId: telegramMessageThreadId,
+      question: questionId,
+      playerId: playerId,
+      answer: answer,
+    });
+    return incorrectAnswerEntry;
+  }
+
+  public async getIncorrectAnswersForQuestion(
+    telegramChatId: number,
+    telegramMessageThreadId: number | undefined,
+    questionId: string,
+    playerId: string,
+  ): Promise<number> {
+    return this.incorrectAnswerModel.countDocuments({
+      question: questionId,
+      playerId: playerId,
+      telegramChatId: telegramChatId,
+      telegramMessageThreadId: telegramMessageThreadId,
+      isDeleted: false,
+    }).exec();
   }
 
   public generateMaskedAnswerClue(answer: string, stage: GAME_STAGE): string {

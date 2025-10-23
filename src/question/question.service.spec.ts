@@ -3,6 +3,7 @@ import { getModelToken } from '@nestjs/mongoose';
 import { QuestionService } from './question.service';
 import { Question } from './question.schema';
 import { QuestionHistory } from './question-history.schema';
+import { IncorrectAnswer } from './incorrect-answer.schema';
 
 describe('QuestionService', () => {
   let service: QuestionService;
@@ -13,6 +14,7 @@ describe('QuestionService', () => {
         QuestionService,
         { provide: getModelToken(Question.name), useValue: {} },
         { provide: getModelToken(QuestionHistory.name), useValue: {} },
+        { provide: getModelToken(IncorrectAnswer.name), useValue: {} },
       ],
     }).compile();
 

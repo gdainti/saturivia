@@ -6,7 +6,7 @@ import { PlayerService } from 'src/player/player.service';
 import { GameService } from 'src/game/game.service';
 import { Game } from 'src/game/game.schema';
 import { QUESTION_TYPE } from 'src/question/question-type';
-import { ReactionType } from 'telegraf/types';
+import { Message, ReactionType } from 'telegraf/types';
 import { QuestionDocument } from 'src/question/question.schema';
 
 // Possible reaction emojis:
@@ -96,7 +96,6 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
         const top = await this.playerService.getTopPlayers(10);
         let topPlayersMessage = '';
 
-        console.log(top);
         if (!top || top.length === 0) {
           topPlayersMessage += '🫙 No scores yet. Play some games!';
         } else {
@@ -247,9 +246,12 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
     const isDifficulty = difficulty && !isNaN(difficulty) && difficulty > 1;
     const isCategory = category && category.trim().length > 0;
 
-    if (isDifficulty || isCategory) {
-      message += '---\n';
-    }
+    //if (isDifficulty || isCategory) {
+    message += '---\n';
+    //}
+
+    // TODO remove when everyone understands the answer format
+    message += 'answer format: \`<b>= answer</b>\` \n';
 
     if (isDifficulty) {
       message += `difficulty: ${this.renderDifficulty(difficulty)}\n`;
@@ -320,6 +322,59 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
     return `\n🔄 /${type}@${this.bot?.botInfo?.username}`;
   }
 
+  private wasBotMentioned(message: Message.TextMessage, botUsername: string | undefined): boolean {
+    if (!message.text || !message.entities || !botUsername) {
+      return false;
+    }
+
+    const targetMention = `@${botUsername}`;
+
+    for (const entity of message.entities) {
+      if (entity.type === 'mention') {
+        const mentionedText = message.text.substring(entity.offset, entity.offset + entity.length);
+
+        if (mentionedText.toLowerCase() === targetMention.toLowerCase()) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  private getMessageForProcessing(ctx: any, text: string): string | null {
+    const eqMatch = text.match(/^\s*=\s*(.*)/s);
+    if (eqMatch) {
+      return eqMatch[1].trim() || null;
+    }
+
+    const botUsername = this.bot?.botInfo?.username;
+    const isReplyBot = (ctx.message as any).reply_to_message?.from?.is_bot;
+    const wasBotRepliedTo = Boolean(isReplyBot && (ctx.message as any).reply_to_message?.from?.username === botUsername);
+
+    const wasBotMentioned = botUsername ? this.wasBotMentioned(ctx.message as Message.TextMessage, botUsername) : false;
+
+    let messageToProcess = text;
+
+    if (wasBotRepliedTo) {
+      return messageToProcess.trim() || null;
+    }
+
+    if (wasBotMentioned && botUsername) {
+      messageToProcess = this.trimBotMention(messageToProcess, botUsername);
+      return messageToProcess.trim() || null;
+    }
+
+    return null;
+  }
+
+
+  private trimBotMention(text: string, botUsername: string): string {
+    const escapedUsername = botUsername.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const mentionRegex = new RegExp(`^@?${escapedUsername}[\\s,:]*`, 'i');
+    return text.replace(mentionRegex, '').trimStart();
+  }
+
   private setBotTextActions() {
 
     if (!this.bot) {
@@ -332,63 +387,103 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
     });
 
     this.bot.on('message', async (ctx, next) => {
-      const chatId = ctx.chat?.id;
+      const telegramChatId = ctx.chat?.id;
       const telegramMessageThreadId = ctx.message?.message_thread_id;
 
-      // only handle text messages
       if (!ctx.message || (ctx.message as any).text === undefined) {
         await next();
         return;
       }
 
-      const text = (ctx.message as any).text as string;
+      const messageText = (ctx.message as any).text as string;
       const { isDM, type, isThread } = this.getChatKind(ctx);
 
       //this.logger.debug(`Incoming text from chat ${chatId} type=${type} thread=${isThread}`);
       //this.logger.debug(`Text: ${text}`);
 
       const isBot = ctx.from?.is_bot && ctx.from.username !== 'GroupAnonymousBot';
-      if (!chatId || !ctx.from || !text || text.startsWith('/') || isDM || isBot) {
+
+      if (!telegramChatId || !ctx.from || !messageText || messageText.startsWith('/') || isDM || isBot) {
         await next();
         return;
       }
 
       try {
-        const game = await this.gameService.getGame(chatId, telegramMessageThreadId);
+        const game = await this.gameService.getGame(telegramChatId, telegramMessageThreadId || null);
 
         if (!game) {
           return;
         }
 
-        const isCorrect = await this.gameService.checkAnswer(
-          chatId,
+        const text = this.getMessageForProcessing(ctx, messageText);
+
+        const isCorrectMessageText = await this.gameService.checkAnswer(
+          game,
+          messageText,
+          telegramChatId,
           telegramMessageThreadId,
-          text,
-          game
         );
 
-        const correctAnswer = game?.question?.answer;
+        if (isCorrectMessageText && !text) {
+          await this.reply(ctx, '🚫Please reply directly to bot or start your answer with "=" to submit your answer');
+          return;
+        }
+
+        if (!text) {
+          await next();
+          return;
+        }
+
+        const originalAnswer = game?.question?.answer;
+
+        // checking trimmed valid answer
+        const isCorrect = await this.gameService.checkAnswer(
+          game,
+          text,
+          telegramChatId,
+          telegramMessageThreadId,
+        );
+
+        // since it is 'official' answer, can record the player right away
+        const player = await this.playerService.findOrCreatePlayer(ctx.from.id, ctx.from.username);
 
         if (isCorrect) {
-          const score = this.gameService.getScoreFromStage(game.question.difficulty, game.stage);
+
+          const wrongAnswers = await this.questionService.getIncorrectAnswersForQuestion(
+            telegramChatId,
+            telegramMessageThreadId,
+            String((game.question as QuestionDocument)._id),
+            String(player._id),
+          );
+
+          const score = this.gameService.getScoreFromStage(game.question.difficulty, game.stage, wrongAnswers);
           const randomReaction = CORRECT_ANSWER_REACTIONS[Math.floor(Math.random() * CORRECT_ANSWER_REACTIONS.length)];
-          this.bot?.telegram.setMessageReaction(chatId, ctx.message.message_id, [randomReaction]);
+          this.bot?.telegram.setMessageReaction(telegramChatId, ctx.message.message_id, [randomReaction]);
           const mentionUser = this.mentionUserByTelegramId(ctx.from.id, ctx.from.username);
-          await this.reply(ctx, `${(randomReaction as { emoji: string }).emoji} <i>${correctAnswer}</i>\n\n---\n${mentionUser}: +${score} points\n${this.getPlayAgainLink(game.question.type)}`);
-          const player = await this.playerService.findOrCreatePlayer(ctx.from.id, ctx.from.username);
+          await this.reply(ctx, `${(randomReaction as { emoji: string }).emoji} <i>${originalAnswer}</i>\n\n---\n${mentionUser}: +${score} points\n${this.getPlayAgainLink(game.question.type)}`);
           await this.gameService.endCurrentGame(
-            chatId,
+            telegramChatId,
             telegramMessageThreadId,
             String((game.question as QuestionDocument)._id),
             score,
             String(player._id),
           );
           // TODO show scoreboard if player entered scoreboard
+
         } else {
-          if (correctAnswer.length === text.length) {
-            const randomReaction = WRONG_ANSWER_REACTIONS[Math.floor(Math.random() * WRONG_ANSWER_REACTIONS.length)];
-            this.bot?.telegram.setMessageReaction(chatId, ctx.message.message_id, [randomReaction]);
-          }
+          // incorrect answer
+
+          this.questionService.saveIncorrectAnswer(
+            telegramChatId,
+            telegramMessageThreadId,
+            String((game.question as QuestionDocument)._id),
+            String(player._id),
+            text
+          );
+
+          //if (originalAnswer.length === text.length) {}
+          const randomReaction = WRONG_ANSWER_REACTIONS[Math.floor(Math.random() * WRONG_ANSWER_REACTIONS.length)];
+          this.bot?.telegram.setMessageReaction(telegramChatId, ctx.message.message_id, [randomReaction]);
         }
       } catch (err) {
         this.logger.error('Error processing text message', err);

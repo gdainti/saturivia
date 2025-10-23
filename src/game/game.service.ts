@@ -21,12 +21,34 @@ export class GameService {
     @InjectModel(QuestionHistory.name) private questionHistoryModel: Model<QuestionHistoryDocument>,
   ) { }
 
-  async getGame(chatId: number, messageId: number | undefined): Promise<Game | null> {
-    const game = await this.gameModel
-      .findOne({ telegramChatId: chatId, telegramMessageThreadId: messageId, isDeleted: false })
+  public async getGame(telegramChatId: number, telegramMessageThreadId: number | null) {
+
+    // exact search for a topic-specific game
+    let game = await this.gameModel
+      .findOne({
+        telegramChatId: telegramChatId,
+        telegramMessageThreadId: telegramMessageThreadId, // can be null here but it is expected
+        isDeleted: false
+      })
       .populate('question')
       .populate('guesser')
       .exec();
+
+    if (game) {
+      return game;
+    }
+
+    if (telegramMessageThreadId !== null) {
+      game = await this.gameModel
+        .findOne({
+          telegramChatId: telegramChatId,
+          telegramMessageThreadId: null,
+          isDeleted: false
+        })
+        .populate('question')
+        .populate('guesser')
+        .exec();
+    }
 
     return game || null;
   }
@@ -81,7 +103,7 @@ export class GameService {
     return updatedGame;
   }
 
-  async checkAnswer(telegramChatId: number, telegramMessageThreadId: number | undefined, givenAnswer: string, game: Game): Promise<boolean> {
+  async checkAnswer(game: Game, givenAnswer: string, telegramChatId: number, telegramMessageThreadId: number | undefined): Promise<boolean> {
     if (!game) throw new NotFoundException(`No active game found for chat ${telegramChatId} message ${telegramMessageThreadId}`);
 
     const correctAnswer = (game.question as any).answer as string;
@@ -93,8 +115,8 @@ export class GameService {
       s = s.replace(/^["'“”«»〞⹂]+|["'“”«»〞⹂]+$/g, '');
       // remove trailing punctuation like ., !, ?
       s = s.replace(/[.!?]+$/g, '');
-        // treat Cyrillic 'ё' and 'Ё' as 'е'
-        s = s.replace(/ё/gi, 'е');
+      // treat Cyrillic 'ё' and 'Ё' as 'е'
+      s = s.replace(/ё/gi, 'е');
       return s.trim();
     };
 
@@ -103,23 +125,26 @@ export class GameService {
     return nGiven === nCorrect;
   }
 
-  public getScoreFromStage(difficulty: string | number, stage: GAME_STAGE): number {
+  public getScoreFromStage(difficulty: string | number, stage: GAME_STAGE, wrongAnswers: number): number {
+
     const difficultyNum = typeof difficulty === 'number' ? difficulty : parseFloat(difficulty);
     let score = difficultyNum;
+    const scoreReduction = wrongAnswers * 0.1;
 
     switch (stage) {
       case GAME_STAGE.CLUE_0:
-        score = difficultyNum;
+        score = difficultyNum; // 1
         break;
       case GAME_STAGE.CLUE_1:
-        score = Math.max(0.2, difficultyNum / 2);
+        score = Math.max(0.2, difficultyNum / 2); // 0.5
         break;
       case GAME_STAGE.CLUE_2:
-        score = Math.max(0.1, difficultyNum / 4);
+        score = Math.max(0.1, difficultyNum / 4); // + 0.25
         break;
     }
 
-    return parseFloat(score.toFixed(2));
+    let finalScore = Math.max(0.05, score - scoreReduction);
+    return parseFloat(finalScore.toFixed(2));
   }
 
   async endCurrentGame(telegramChatId: number, telegramMessageThreadId: number | undefined, questionId: string, score: number, playerId: string | null): Promise<void> {
