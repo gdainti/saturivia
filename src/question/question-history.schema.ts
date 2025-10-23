@@ -29,10 +29,10 @@ export class QuestionHistory {
   @Prop({ required: false, type: Number, default: 1 })
   score: number;
 
-  @Prop({ required: true, unique: false })
+  @Prop({ required: false, unique: false })
   telegramChatId: number;
 
-  @Prop({ required: true, unique: false })
+  @Prop({ required: false, unique: false })
   telegramMessageThreadId: number;
 
   @Prop({ default: false })
