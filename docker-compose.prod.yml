@@ -1,21 +1,21 @@
 services:
   saturivia-nestjs:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ${IMAGE}:${TAG}
     container_name: saturivia-nestjs
     restart: always
     environment:
-      MONGO_USERNAME: ${MONGO_USERNAME:-mongouser}
-      MONGO_PASSWORD: ${MONGO_PASSWORD:-password}
-      MONGO_HOST: saturivia-mongo
+      MONGO_USERNAME: ${MONGO_USERNAME}
+      MONGO_PASSWORD: ${MONGO_PASSWORD}
+      MONGO_HOST: ${MONGO_HOST}
+      MONGO_AUTH_DB: ${MONGO_AUTH_DB:-admin}
       MONGO_PORT: ${MONGO_PORT:-27017}
-      MONGO_DATABASE: ${MONGO_DATABASE:-saturivia-db}
+      MONGO_DATABASE: ${MONGO_DATABASE}
     ports:
       - "4000:4000"
+    env_file:
+      - .env
     volumes:
-      - .:/usr/src/app
-      - /usr/src/app/node_modules
+      - ./data:/usr/src/app/data
     depends_on:
       - saturivia-mongo
     networks:
@@ -23,11 +23,18 @@ services:
 
   saturivia-mongo:
     image: mongo:latest
+    security_opt:
+      - seccomp:unconfined
+    cap_add:
+      - SYS_RESOURCE
     container_name: saturivia-mongo
     restart: always
+    env_file:
+      - .env
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USERNAME:-mongouser}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-password}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE}
     ports:
       - "27017:27017"
     volumes:

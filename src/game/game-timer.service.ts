@@ -117,11 +117,12 @@ export class GameTimerService implements OnModuleInit {
     }
   }
 
-  async endGame(chatId: number, telegramMessageThreadId: number | undefined): Promise<void> {
+  async endGame(telegramChatId: number, telegramMessageThreadId: number | undefined): Promise<void> {
+
     try {
       const game = await this.gameModel
         .findOne({
-          telegramChatId: chatId,
+          telegramChatId: telegramChatId,
           telegramMessageThreadId: telegramMessageThreadId,
           isDeleted: false
         })
@@ -129,17 +130,21 @@ export class GameTimerService implements OnModuleInit {
         .exec();
 
       if (!game) {
-        this.logger.log(`Game ${chatId}_${telegramMessageThreadId} not found for ending`);
+        this.logger.log(`Game ${telegramChatId}_${telegramMessageThreadId} not found for ending`);
         return;
       }
 
-      await this.stopTimer(chatId, telegramMessageThreadId);
-      const endTimerKey = `${chatId}_${telegramMessageThreadId}_end`;
+      await this.stopTimer(telegramChatId, telegramMessageThreadId);
+      const endTimerKey = `${telegramChatId}_${telegramMessageThreadId}_end`;
       this.clearTimer(endTimerKey);
 
-      this.logger.log(`Game ${chatId}_${telegramMessageThreadId} ended due to timeout`);
+      await this.gameModel.deleteOne(
+      { telegramChatId: telegramChatId, telegramMessageThreadId: telegramMessageThreadId }
+    ).exec();
+
+      this.logger.log(`Game ${telegramChatId}_${telegramMessageThreadId} ended due to timeout`);
     } catch (error) {
-      this.logger.error(`Error ending game ${chatId}_${telegramMessageThreadId}:`, error);
+      this.logger.error(`Error ending game ${telegramChatId}_${telegramMessageThreadId}:`, error);
     }
   }
 

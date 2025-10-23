@@ -62,8 +62,10 @@ export class QuestionService {
     return this.generateMaskedAnswerClue(question.answer, stage);
   }
 
-  public async saveHistoryQuestion(questionId: string, score: number = 0, playerId: string | null = null): Promise<QuestionHistory> {
+  public async saveHistoryQuestion(telegramChatId: number, telegramMessageThreadId: number | undefined, questionId: string, score: number = 0, playerId: string | null = null): Promise<QuestionHistory> {
     const historyEntry = await this.questionHistoryModel.create({
+      telegramChatId: telegramChatId,
+      telegramMessageThreadId: telegramMessageThreadId,
       question: questionId,
       playerId: playerId,
       score: score

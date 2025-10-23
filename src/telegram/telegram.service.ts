@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, OnModuleDestroy, Inject, forwardRef, OnApplicationBootstrap } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Context, Telegraf } from 'telegraf';
 import { QuestionService } from 'src/question/question.service';
@@ -52,7 +52,7 @@ interface BotCommand {
 }
 
 @Injectable()
-export class TelegramService implements OnModuleInit, OnModuleDestroy {
+export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger(TelegramService.name);
   private bot: Telegraf | null = null;
 
@@ -69,6 +69,14 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
       description: 'How to play',
       action: async (ctx) => {
         await this.reply(ctx, '🚧 Help information here');
+      }
+    },
+    {
+      command: 'version',
+      description: 'app package version',
+      action: async (ctx) => {
+        const version = process.env.npm_package_version ?? 'unknown';
+        await this.reply(ctx, version);
       }
     },
     {
@@ -144,7 +152,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     }
   ];
 
-  onModuleInit() {
+  onApplicationBootstrap() {
     try {
       this.init();
     }
@@ -200,11 +208,13 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     if (this.bot) {
       await this.bot.stop('SIGINT');
       await this.bot.stop('SIGTERM');
+      this.bot = null;
+      this.logger.log('Telegram bot stopped.');
     }
   }
 
   public async revealAnswer(chatId: number, telegramMessageThreadId: number | undefined, question: QuestionDocument): Promise<void> {
-    await this.sendMessage(chatId, telegramMessageThreadId, `Answer: <b>${question.answer}</b>\n${this.getPlayAgainLink(question.type)}`);
+    await this.sendMessage(chatId, telegramMessageThreadId, `❄️Answer: <i>${question.answer}</i>\n${this.getPlayAgainLink(question.type)}`);
   }
 
   private async init() {
@@ -238,7 +248,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
     if (!type || !this.bot?.botInfo?.username) {
       return '';
     }
-    return `\n🔄play again: /${type}@${this.bot?.botInfo?.username}`;
+    return `\n🔄 /${type}@${this.bot?.botInfo?.username}`;
   }
 
   private setBotTextActions() {
@@ -295,7 +305,7 @@ export class TelegramService implements OnModuleInit, OnModuleDestroy {
           const randomReaction = CORRECT_ANSWER_REACTIONS[Math.floor(Math.random() * CORRECT_ANSWER_REACTIONS.length)];
           this.bot?.telegram.setMessageReaction(chatId, ctx.message.message_id, [randomReaction]);
           const mentionUser = this.mentionUserByTelegramId(ctx.from.id, ctx.from.username);
-          await this.reply(ctx, `Correct ${randomReaction}! ${correctAnswer}.\n---\n${mentionUser}: +${score} points\n${this.getPlayAgainLink(game.question.type)}`);
+          await this.reply(ctx, `${(randomReaction as {emoji: string }).emoji} <i>${correctAnswer}</i>\n\n---\n${mentionUser}: +${score} points\n${this.getPlayAgainLink(game.question.type)}`);
           const player = await this.playerService.findOrCreatePlayer(ctx.from.id, ctx.from.username);
           await this.gameService.endCurrentGame(
             chatId,

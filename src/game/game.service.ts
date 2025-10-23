@@ -129,7 +129,7 @@ export class GameService {
       { telegramChatId: telegramChatId, telegramMessageThreadId: telegramMessageThreadId }
     ).exec();
 
-    await this.questionService.saveHistoryQuestion(questionId, score, playerId);
+    await this.questionService.saveHistoryQuestion(telegramChatId, telegramMessageThreadId, questionId, score, playerId);
   }
 
 
