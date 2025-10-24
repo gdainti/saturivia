@@ -1,6 +1,6 @@
 {
   "name": "saturivia",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "telegram trivia bot",
   "author": "gdainti",
   "private": true,
@@ -21,8 +21,8 @@
     "patch": "npm version patch --no-git-tag-version",
     "minor": "npm version minor --no-git-tag-version",
     "major": "npm version major --no-git-tag-version",
-    "seed": "node -r tsconfig-paths/register -r ts-node/register ./scripts/seed-questions.ts",
-    "parse": "node -r tsconfig-paths/register -r ts-node/register ./scripts/parse-questions.ts"
+    "seed": "SCRIPT_MODE=true node -r tsconfig-paths/register -r ts-node/register ./scripts/seed-questions.ts",
+    "parse": "SCRIPT_MODE=true node -r tsconfig-paths/register -r ts-node/register ./scripts/parse-questions.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

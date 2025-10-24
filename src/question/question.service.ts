@@ -1,3 +1,4 @@
+// ...existing code...
 import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -17,6 +18,14 @@ export class QuestionService {
     @InjectModel(QuestionHistory.name) private questionHistoryModel: Model<QuestionHistoryDocument>,
     @InjectModel(IncorrectAnswer.name) private incorrectAnswerModel: Model<IncorrectAnswerDocument>,
   ) { }
+
+  async getTotalWrongAnswers(): Promise<number> {
+    return this.incorrectAnswerModel.countDocuments({}).exec();
+  }
+
+  async getCorrectAnswersCount(): Promise<number> {
+    return this.questionHistoryModel.countDocuments({ playerId: { $exists: true, $ne: null } }).exec();
+  }
 
   async getRandomQuestion(type: QUESTION_TYPE): Promise<Question> {
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);

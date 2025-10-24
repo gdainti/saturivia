@@ -67,7 +67,7 @@ export class GameTimerService implements OnModuleInit {
 
   async stopTimer(chatId: number, telegramMessageThreadId: number | undefined): Promise<void> {
     const prefix = `${chatId}_${telegramMessageThreadId}`;
-    // Clear any timers for this game (including stage and end timers)
+
     for (const [key, timer] of this.activeTimers.entries()) {
       if (key.startsWith(prefix)) {
         clearTimeout(timer);

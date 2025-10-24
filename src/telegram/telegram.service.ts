@@ -57,13 +57,16 @@ interface BotCommand {
 export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger(TelegramService.name);
   private bot: Telegraf | null = null;
+  private isScriptMode: boolean = false;
 
   constructor(
     private configService: ConfigService,
     private questionService: QuestionService,
     private playerService: PlayerService,
     @Inject(forwardRef(() => GameService)) private gameService: GameService,
-  ) { }
+  ) {
+    this.isScriptMode = !!process.env.SCRIPT_MODE;
+  }
 
   private readonly botCommands: BotCommand[] = [
     {
@@ -93,15 +96,6 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
       description: 'View game statistics',
       action: async (ctx) => {
 
-        const totalQuestions = await this.questionService.getTotalQuestions();
-        const totalPlayers = await this.playerService.getTotalPlayers();
-        const totalGames = await this.questionService.getTotalHistoryQuestions();
-
-        let statsMessage = '📊Stats\n\n';
-        statsMessage += `- Total Questions: <b>${totalQuestions}</b>\n`;
-        statsMessage += `- Questions played: <b>${totalGames}</b>\n`;
-        statsMessage += `- Total players: <b>${totalPlayers}</b>\n`;
-
         const top = await this.playerService.getTopPlayers(10);
         let topPlayersMessage = '';
 
@@ -113,7 +107,20 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
           topPlayersMessage += lines.join('\n');
         }
 
-        await this.reply(ctx, `${statsMessage}\n---\n\n${topPlayersMessage}`);
+        const totalQuestions = await this.questionService.getTotalQuestions();
+        const totalPlayers = await this.playerService.getTotalPlayers();
+        const totalGames = await this.questionService.getTotalHistoryQuestions();
+        const totalWrongAnswers = await this.questionService.getTotalWrongAnswers();
+        const totalCorrectAnswers = await this.questionService.getCorrectAnswersCount();
+
+        let statsMessage = '📊Stats\n\n';
+        statsMessage += `- Total Questions: <b>${totalQuestions}</b>\n`;
+        statsMessage += `- Questions played: <b>${totalGames}</b>\n`;
+        statsMessage += `- Total players: <b>${totalPlayers}</b>\n`;
+        statsMessage += `- Total wrong answers: <b>${totalWrongAnswers}</b>\n`;
+        statsMessage += `- Total correct answers: <b>${totalCorrectAnswers}</b>\n`;
+
+        await this.reply(ctx, `${topPlayersMessage}\n---\n\n${statsMessage}`);
       }
     },
     {
@@ -184,6 +191,12 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
   }
 
   onApplicationBootstrap() {
+
+    if (this.isScriptMode) {
+      this.logger.log('Script mode is enabled, skipping telegram service');
+      return;
+    }
+
     try {
       this.init();
     }
@@ -279,6 +292,11 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
   }
 
   private async stopBot() {
+
+    if (this.isScriptMode) {
+      return;
+    }
+
     if (this.bot) {
       await this.bot.stop('SIGINT');
       await this.bot.stop('SIGTERM');
@@ -341,7 +359,6 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
     for (const entity of message.entities) {
       if (entity.type === 'mention') {
         const mentionedText = message.text.substring(entity.offset, entity.offset + entity.length);
-
         if (mentionedText.toLowerCase() === targetMention.toLowerCase()) {
           return true;
         }
@@ -360,28 +377,26 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
     const botUsername = this.bot?.botInfo?.username;
     const isReplyBot = (ctx.message as any).reply_to_message?.from?.is_bot;
     const wasBotRepliedTo = Boolean(isReplyBot && (ctx.message as any).reply_to_message?.from?.username === botUsername);
-
     const wasBotMentioned = botUsername ? this.wasBotMentioned(ctx.message as Message.TextMessage, botUsername) : false;
+    const messageToProcess = this.trimBotMention(text, botUsername).trim() || null;
 
-    let messageToProcess = text;
-
-    if (wasBotRepliedTo) {
-      return messageToProcess.trim() || null;
-    }
-
-    if (wasBotMentioned && botUsername) {
-      messageToProcess = this.trimBotMention(messageToProcess, botUsername);
-      return messageToProcess.trim() || null;
+    if (wasBotRepliedTo || wasBotMentioned) {
+      return messageToProcess || null;
     }
 
     return null;
   }
 
-
-  private trimBotMention(text: string, botUsername: string): string {
+  private trimBotMention(text: string, botUsername: string | undefined): string {
+    if (!botUsername) {
+      return text;
+    }
     const escapedUsername = botUsername.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-    const mentionRegex = new RegExp(`^@?${escapedUsername}[\\s,:]*`, 'i');
-    return text.replace(mentionRegex, '').trimStart();
+    const mentionRegex = new RegExp(`\s*@?${escapedUsername}[\\s,:]*`, 'gi');
+    let result = text.replace(mentionRegex, ' ');
+    result = result.replace(/\s+([!,.?;:])/g, '$1');
+    result = result.replace(/\s+/g, ' ').trim();
+    return result;
   }
 
   private setBotTextActions() {
@@ -397,7 +412,10 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
 
     this.bot.on('message', async (ctx, next) => {
       const telegramChatId = ctx.chat?.id;
-      const telegramMessageThreadId = ctx.message?.message_thread_id;
+      const topicMessage = ctx.message?.is_topic_message;
+      // telegramMessageThreadId needs to be filled only for topics, to distinguish threads and main chat
+      const telegramMessageThreadId = topicMessage ? ctx.message?.message_thread_id : undefined;
+      const replyToMessage = (ctx.message as any).reply_to_message;
 
       if (!ctx.message || (ctx.message as any).text === undefined) {
         await next();
@@ -406,9 +424,6 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
 
       const messageText = (ctx.message as any).text as string;
       const { isDM, type, isThread } = this.getChatKind(ctx);
-
-      //this.logger.debug(`Incoming text from chat ${chatId} type=${type} thread=${isThread}`);
-      //this.logger.debug(`Text: ${text}`);
 
       const isBot = ctx.from?.is_bot && ctx.from.username !== 'GroupAnonymousBot';
 
