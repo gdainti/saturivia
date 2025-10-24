@@ -103,7 +103,7 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
           topPlayersMessage += '🫙 No scores yet. Play some games!';
         } else {
           const lines = top.map((t, i) => `${i + 1}. ${t.username ?? t.telegramId} — <b>${t.totalScore}</b>`);
-          topPlayersMessage += '🏆 Top Players:\n';
+          topPlayersMessage += '🏆 Leaderboard\n';
           topPlayersMessage += lines.join('\n');
         }
 
@@ -113,14 +113,15 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
         const totalWrongAnswers = await this.questionService.getTotalWrongAnswers();
         const totalCorrectAnswers = await this.questionService.getCorrectAnswersCount();
 
-        let statsMessage = '📊Stats\n\n';
-        statsMessage += `- Total Questions: <b>${totalQuestions}</b>\n`;
-        statsMessage += `- Questions played: <b>${totalGames}</b>\n`;
-        statsMessage += `- Total players: <b>${totalPlayers}</b>\n`;
-        statsMessage += `- Total wrong answers: <b>${totalWrongAnswers}</b>\n`;
-        statsMessage += `- Total correct answers: <b>${totalCorrectAnswers}</b>\n`;
+        let statsMessage = '📊Stats\n';
+        statsMessage += `- total questions: <b>${totalQuestions}</b>\n`;
+        statsMessage += `- total players: <b>${totalPlayers}</b>\n`;
+        statsMessage += `- questions played: <b>${totalGames}</b>\n`;
+        statsMessage += `- questions answered: <b>${totalCorrectAnswers}</b>\n`;
+        statsMessage += `- questions unanswered: <b>${totalGames - totalCorrectAnswers}</b>\n`;
+        statsMessage += `- incorrect answers: <b>${totalWrongAnswers}</b>\n`;
 
-        await this.reply(ctx, `${topPlayersMessage}\n---\n\n${statsMessage}`);
+        await this.reply(ctx, `${topPlayersMessage}\n\n---\n\n${statsMessage}`);
       }
     },
     {
