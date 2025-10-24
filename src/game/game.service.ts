@@ -125,25 +125,25 @@ export class GameService {
     return nGiven === nCorrect;
   }
 
-  public getScoreFromStage(difficulty: string | number, stage: GAME_STAGE, wrongAnswers: number): number {
-
-    const difficultyNum = typeof difficulty === 'number' ? difficulty : parseFloat(difficulty);
-    let score = difficultyNum;
-    const scoreReduction = wrongAnswers * 0.1;
+  // TODO consider timing as well, logarithmic decay?
+  public getScoreFromStage(difficulty: number = 1, stage: GAME_STAGE, wrongAnswers: number): number {
+    let score = difficulty;
 
     switch (stage) {
       case GAME_STAGE.CLUE_0:
-        score = difficultyNum; // 1
+        score = difficulty; // +1
         break;
       case GAME_STAGE.CLUE_1:
-        score = Math.max(0.2, difficultyNum / 2); // 0.5
+        score = Math.max(0.2, difficulty / 2); // +0.5
         break;
       case GAME_STAGE.CLUE_2:
-        score = Math.max(0.1, difficultyNum / 4); // + 0.25
+        score = Math.max(0.1, difficulty / 4); // +0.25
         break;
     }
 
-    let finalScore = Math.max(0.05, score - scoreReduction);
+    const scoreReduction = wrongAnswers * difficulty / 10;
+    const finalScore = Math.max(0.01, score - scoreReduction);
+
     return parseFloat(finalScore.toFixed(2));
   }
 
