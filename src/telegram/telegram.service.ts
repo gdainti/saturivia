@@ -434,7 +434,7 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
       }
 
       try {
-        const game = await this.gameService.getGame(telegramChatId, telegramMessageThreadId || null);
+        const game = await this.gameService.getGame(telegramChatId, telegramMessageThreadId || undefined);
 
         if (!game) {
           return;
