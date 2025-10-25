@@ -127,7 +127,7 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
         const player = await this.playerService.findPlayerByTelegramId(ctx.from.id);
 
         if (player) {
-          personalMessage = `${this.mentionUserByTelegramId(String(player._id), player.username)}\n`;
+          personalMessage = `👤<b>${player.username}</b>\n`;
 
           const totalCorrectAnswers = await this.questionService.getCorrectAnswersCount(String(player._id));
           const totalWrongAnswers = await this.questionService.getTotalWrongAnswers(String(player._id));
