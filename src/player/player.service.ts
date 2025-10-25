@@ -24,6 +24,10 @@ export class PlayerService {
 		return created;
 	}
 
+	async findPlayerByTelegramId(telegramId: number, username?: string) {
+		return await this.playerModel.findOne({ telegramId }).exec();
+	}
+
 	async getTopPlayers(limit = 5) {
 		const pipeline = [
 			{ $match: { isDeleted: false, playerId: { $exists: true, $ne: null } } }, // Only answered questions
@@ -59,33 +63,6 @@ export class PlayerService {
 			this.logger.error('Failed to record unanswered question', err);
 			throw err;
 		}
-	}
-
-	async getPlayerStats(playerId: string) {
-		const pipeline = [
-			{ $match: { playerId, isDeleted: false } },
-			{
-				$group: {
-					_id: null,
-					totalAnswered: { $sum: 1 },
-					totalScore: { $sum: '$score' },
-					averageScore: { $avg: '$score' }
-				}
-			}
-		];
-
-		const stats = await this.questionHistoryModel.aggregate(pipeline).exec();
-		const unanswered = await this.questionHistoryModel.countDocuments({
-			playerId: null,
-			isDeleted: false
-		});
-
-		return {
-			totalAnswered: stats[0]?.totalAnswered || 0,
-			totalScore: stats[0]?.totalScore || 0,
-			averageScore: stats[0]?.averageScore || 0,
-			totalUnanswered: unanswered
-		};
 	}
 
 	async getQuestionStats(questionId: string) {

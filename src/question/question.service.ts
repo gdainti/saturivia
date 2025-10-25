@@ -19,12 +19,21 @@ export class QuestionService {
     @InjectModel(IncorrectAnswer.name) private incorrectAnswerModel: Model<IncorrectAnswerDocument>,
   ) { }
 
-  async getTotalWrongAnswers(): Promise<number> {
-    return this.incorrectAnswerModel.countDocuments({}).exec();
+  async getTotalWrongAnswers(playerId: string | undefined = undefined): Promise<number> {
+    return this.incorrectAnswerModel.countDocuments({ playerId: playerId }).exec();
   }
 
-  async getCorrectAnswersCount(): Promise<number> {
-    return this.questionHistoryModel.countDocuments({ playerId: { $exists: true, $ne: null } }).exec();
+  async getCorrectAnswersCount(playerId: string | undefined = undefined): Promise<number> {
+    let playerIdFilter = {};
+
+    if (playerId) {
+      playerIdFilter = { playerId: playerId };
+    }
+    else {
+      playerIdFilter = { playerId: { $exists: true, $ne: null } };
+    }
+
+    return this.questionHistoryModel.countDocuments(playerIdFilter).exec();
   }
 
   async getRandomQuestion(type: QUESTION_TYPE): Promise<Question> {
@@ -203,7 +212,7 @@ export class QuestionService {
     return this.questionModel.countDocuments({ isDeleted: false }).exec();
   }
 
-  public async getTotalHistoryQuestions(): Promise<number> {
-    return this.questionHistoryModel.countDocuments().exec();
+  public async getTotalHistoryQuestions(playerId: string | undefined = undefined): Promise<number> {
+    return this.questionHistoryModel.countDocuments({ playerId: playerId }).exec();
   }
 }
