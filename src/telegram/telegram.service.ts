@@ -272,9 +272,9 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
     const isDifficulty = difficulty && !isNaN(difficulty) && difficulty > 1;
     const isCategory = category && category.trim().length > 0;
 
-    //if (isDifficulty || isCategory) {
-    message += '---\n';
-    //}
+    if (isDifficulty || isCategory) {
+      message += '---\n';
+    }
 
     if (isDifficulty) {
       message += `difficulty: ${this.renderDifficulty(difficulty)}\n`;
