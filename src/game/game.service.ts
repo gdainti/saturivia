@@ -33,7 +33,7 @@ export class GameService {
   }
 
 
-  async startNewGame(chatId: number, telegramMessageThreadId: number | undefined, type: QUESTION_TYPE): Promise<Game | null> {
+  async startNewGame(chatId: number, telegramMessageThreadId: number | undefined, type: QUESTION_TYPE, triggeredPlayerId: string): Promise<Game | null> {
     const question = await this.questionService.getRandomQuestion(type) as QuestionDocument;
 
     if (!question) {
@@ -55,12 +55,13 @@ export class GameService {
         guesser: null,
         isDeleted: false,
         lastClueAt: new Date(),
+        triggeredPlayerId: triggeredPlayerId
       },
       { new: true, upsert: true, setDefaultsOnInsert: true }
     ).exec();
 
     // Start the timer for this game
-    await this.gameTimerService.startTimer(chatId, telegramMessageThreadId, question.type, GAME_STAGE.CLUE_0);
+    await this.gameTimerService.startTimer(chatId, telegramMessageThreadId, question.type, GAME_STAGE.CLUE_0, triggeredPlayerId);
 
     return this.gameModel.findById(newGame._id).populate('question').exec();
   }
@@ -124,7 +125,7 @@ export class GameService {
     return parseFloat(finalScore.toFixed(2));
   }
 
-  async endCurrentGame(telegramChatId: number, telegramMessageThreadId: number | undefined, questionId: string, score: number, playerId: string | null): Promise<void> {
+  async endCurrentGame(telegramChatId: number, telegramMessageThreadId: number | undefined, questionId: string, score: number, playerId: string | null, triggeredPlayerId: string, stage: GAME_STAGE): Promise<void> {
 
     await this.gameTimerService.stopTimer(telegramChatId, telegramMessageThreadId);
 
@@ -133,7 +134,15 @@ export class GameService {
       { telegramChatId: telegramChatId, telegramMessageThreadId: telegramMessageThreadId }
     ).exec();
 
-    await this.questionService.saveHistoryQuestion(telegramChatId, telegramMessageThreadId, questionId, score, playerId);
+    await this.questionService.saveHistoryQuestion(
+      telegramChatId,
+      telegramMessageThreadId,
+      questionId,
+      score,
+      playerId,
+      triggeredPlayerId,
+      stage
+    );
   }
 
 

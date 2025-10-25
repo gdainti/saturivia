@@ -148,7 +148,10 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
           return;
         }
 
-        game = await this.gameService.startNewGame(chatId, telegramMessageThreadId, QUESTION_TYPE.TRIVIA);
+        const player = await this.playerService.findOrCreatePlayer(ctx.from.id, ctx.from.username);
+        const triggeredPlayerId = String(player._id);
+
+        game = await this.gameService.startNewGame(chatId, telegramMessageThreadId, QUESTION_TYPE.TRIVIA, triggeredPlayerId);
         if (!game || !game.question?.question || !game.question?.answer) {
           await this.reply(ctx, '❌ Error: could not start a new game.');
           return;
@@ -492,6 +495,8 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
             String((game.question as QuestionDocument)._id),
             score,
             String(player._id),
+            String(game.triggeredPlayerId),
+            game.stage
           );
           // TODO show scoreboard if player entered scoreboard
 

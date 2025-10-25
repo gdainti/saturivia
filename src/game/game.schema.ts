@@ -4,11 +4,11 @@ import { Question } from '../question/question.schema';
 import { Player } from 'src/player/player.schema';
 
 export enum GAME_STAGE {
-  CLUE_0 = 'CLUE_0',
-  CLUE_1 = 'CLUE_1',
-  CLUE_2 = 'CLUE_2',
-  REVEAL = 'REVEAL',
-}
+  CLUE_0 = 'CLUE_0', // initial state
+  CLUE_1 = 'CLUE_1', // first clue
+  CLUE_2 = 'CLUE_2', // second clue
+  RESULT = 'RESULT', // show answer
+};
 
 export type GameDocument = Game & Document;
 
@@ -44,6 +44,14 @@ export class Game {
     default: null
   })
   guesser: Player;
+
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Player',
+    required: false,
+    index: true
+  })
+  triggeredPlayerId: Player;
 
   @Prop({ default: false })
   isDeleted: boolean;

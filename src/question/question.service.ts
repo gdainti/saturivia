@@ -73,13 +73,22 @@ export class QuestionService {
     return this.generateMaskedAnswerClue(question.answer, stage);
   }
 
-  public async saveHistoryQuestion(telegramChatId: number, telegramMessageThreadId: number | undefined, questionId: string, score: number = 0, playerId: string | null = null): Promise<QuestionHistory> {
+  public async saveHistoryQuestion(
+    telegramChatId: number,
+    telegramMessageThreadId: number | undefined,
+    questionId: string, score: number = 0,
+    playerId: string | null = null,
+    triggeredPlayerId: string,
+    stage: GAME_STAGE
+  ): Promise<QuestionHistory> {
     const historyEntry = await this.questionHistoryModel.create({
       telegramChatId: telegramChatId,
       telegramMessageThreadId: telegramMessageThreadId,
       question: questionId,
       playerId: playerId,
-      score: score
+      triggeredPlayerId: triggeredPlayerId,
+      score: score,
+      stage: stage,
     });
     return historyEntry;
   }
@@ -132,7 +141,7 @@ export class QuestionService {
       case GAME_STAGE.CLUE_2:
         revealPercentage = 0.65;
         break;
-      case GAME_STAGE.REVEAL:
+      case GAME_STAGE.RESULT:
         return answer;
       default:
         return answer.replace(ALPHANUMERIC_GLOBAL_REGEX, MASK_CHARACTER);

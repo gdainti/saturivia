@@ -23,7 +23,7 @@ export class GameTimerService implements OnModuleInit {
     await this.advanceOngoingGamesOnStartup();
   }
 
-  async startTimer(chatId: number, telegramMessageThreadId: number | undefined, questionType: string, currentStage: GAME_STAGE): Promise<void> {
+  async startTimer(chatId: number, telegramMessageThreadId: number | undefined, questionType: string, currentStage: GAME_STAGE, triggeredPlayerId: string): Promise<void> {
     const gameKey = `${chatId}_${telegramMessageThreadId}`;
 
     this.clearTimer(gameKey);
@@ -45,7 +45,7 @@ export class GameTimerService implements OnModuleInit {
 
     const timer = setTimeout(async () => {
       try {
-        await this.advanceGame(chatId, telegramMessageThreadId, nextStage);
+        await this.advanceGame(chatId, telegramMessageThreadId, nextStage, triggeredPlayerId);
         this.activeTimers.delete(gameKey);
       } catch (error) {
         this.logger.error(`Error advancing game ${gameKey}:`, error);
@@ -90,7 +90,7 @@ export class GameTimerService implements OnModuleInit {
     }
   }
 
-  private async advanceGame(chatId: number, telegramMessageThreadId: number | undefined, newStage: GAME_STAGE): Promise<void> {
+  private async advanceGame(chatId: number, telegramMessageThreadId: number | undefined, newStage: GAME_STAGE, triggeredPlayerId: string): Promise<void> {
 
     const question: QuestionDocument | null = await this.gameService.advanceGame(chatId, telegramMessageThreadId, newStage);
 
@@ -105,7 +105,15 @@ export class GameTimerService implements OnModuleInit {
         try {
           await this.stopTimer(chatId, telegramMessageThreadId);
           await this.gameService.revealAnswer(chatId, telegramMessageThreadId, question);
-          await this.gameService.endCurrentGame(chatId, telegramMessageThreadId, String(question._id), 0, null);
+          await this.gameService.endCurrentGame(
+            chatId,
+            telegramMessageThreadId,
+            String(question._id),
+            0,
+            null,
+            triggeredPlayerId,
+            newStage
+          );
         } catch (err) {
           this.logger.error(`Error revealing answer for ${chatId}_${telegramMessageThreadId}:`, err);
         }
@@ -113,7 +121,7 @@ export class GameTimerService implements OnModuleInit {
 
       this.activeTimers.set(`${chatId}_${telegramMessageThreadId}_end`, revealTimer);
     } else {
-      await this.startTimer(chatId, telegramMessageThreadId, question.type, newStage);
+      await this.startTimer(chatId, telegramMessageThreadId, question.type, newStage, triggeredPlayerId);
     }
   }
 
@@ -139,8 +147,8 @@ export class GameTimerService implements OnModuleInit {
       this.clearTimer(endTimerKey);
 
       await this.gameModel.deleteOne(
-      { telegramChatId: telegramChatId, telegramMessageThreadId: telegramMessageThreadId }
-    ).exec();
+        { telegramChatId: telegramChatId, telegramMessageThreadId: telegramMessageThreadId }
+      ).exec();
 
       this.logger.log(`Game ${telegramChatId}_${telegramMessageThreadId} ended due to timeout`);
     } catch (error) {
@@ -167,19 +175,27 @@ export class GameTimerService implements OnModuleInit {
       for (const game of ongoingGames) {
         const gameKey = `${game.telegramChatId}_${game.telegramMessageThreadId}`;
 
-        if (game.stage === GAME_STAGE.REVEAL) {
+        if (game.stage === GAME_STAGE.RESULT) {
           this.logger.log(`Revealing answer for final stage game ${gameKey} on startup`);
           const questionDoc = game.question as QuestionDocument;
           await this.stopTimer(game.telegramChatId, game.telegramMessageThreadId);
           await this.gameService.revealAnswer(game.telegramChatId, game.telegramMessageThreadId, questionDoc);
-          await this.gameService.endCurrentGame(game.telegramChatId, game.telegramMessageThreadId, String(questionDoc._id), 0, null);
+          await this.gameService.endCurrentGame(
+            game.telegramChatId,
+            game.telegramMessageThreadId,
+            String(questionDoc._id),
+            0,
+            null,
+            String(game.triggeredPlayerId),
+            game.stage
+          );
           continue;
         }
 
         const nextStage = this.getNextStage(game.stage);
         if (nextStage) {
           this.logger.log(`Advancing game ${gameKey} from ${game.stage} to ${nextStage} on startup`);
-          await this.advanceGame(game.telegramChatId, game.telegramMessageThreadId, nextStage);
+          await this.advanceGame(game.telegramChatId, game.telegramMessageThreadId, nextStage, String(game.triggeredPlayerId));
         } else {
           this.logger.log(`Ending game ${gameKey} (no next stage) on startup`);
           await this.endGame(game.telegramChatId, game.telegramMessageThreadId);
