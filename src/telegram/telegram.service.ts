@@ -276,9 +276,6 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
     message += '---\n';
     //}
 
-    // TODO remove when everyone understands the answer format
-    message += 'answer format: \`<b>= answer</b>\` \n';
-
     if (isDifficulty) {
       message += `difficulty: ${this.renderDifficulty(difficulty)}\n`;
     }
