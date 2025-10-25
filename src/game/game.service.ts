@@ -21,37 +21,17 @@ export class GameService {
     @InjectModel(QuestionHistory.name) private questionHistoryModel: Model<QuestionHistoryDocument>,
   ) { }
 
-  public async getGame(telegramChatId: number, telegramMessageThreadId: number | null) {
+  async getGame(chatId: number, messageId: number | undefined): Promise<Game | null> {
 
-    // exact search for a topic-specific game
-    let game = await this.gameModel
-      .findOne({
-        telegramChatId: telegramChatId,
-        telegramMessageThreadId: telegramMessageThreadId, // can be null here but it is expected
-        isDeleted: false
-      })
+    const game = await this.gameModel
+      .findOne({ telegramChatId: chatId, telegramMessageThreadId: messageId, isDeleted: false })
       .populate('question')
       .populate('guesser')
       .exec();
 
-    if (game) {
-      return game;
-    }
-
-    if (telegramMessageThreadId !== null) {
-      game = await this.gameModel
-        .findOne({
-          telegramChatId: telegramChatId,
-          telegramMessageThreadId: null,
-          isDeleted: false
-        })
-        .populate('question')
-        .populate('guesser')
-        .exec();
-    }
-
     return game || null;
   }
+
 
   async startNewGame(chatId: number, telegramMessageThreadId: number | undefined, type: QUESTION_TYPE): Promise<Game | null> {
     const question = await this.questionService.getRandomQuestion(type) as QuestionDocument;
@@ -111,11 +91,8 @@ export class GameService {
 
     const normalize = (input: string) => {
       let s = input.trim().toLowerCase();
-      // strip surrounding quotes including ASCII and Unicode variants
       s = s.replace(/^["'“”«»〞⹂]+|["'“”«»〞⹂]+$/g, '');
-      // remove trailing punctuation like ., !, ?
       s = s.replace(/[.!?]+$/g, '');
-      // treat Cyrillic 'ё' and 'Ё' as 'е'
       s = s.replace(/ё/gi, 'е');
       return s.trim();
     };
