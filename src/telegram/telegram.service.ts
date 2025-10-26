@@ -73,7 +73,7 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
       command: 'help',
       description: 'How to play',
       action: async (ctx) => {
-        let helpMessage = `🤖<b>${this.bot?.botInfo?.username || 'Saturivia'} Bot Help</b> 🪐\n\n`;
+        let helpMessage = `🤖 <b>${this.bot?.botInfo?.username || 'Saturivia'} Bot Help</b> 🪐\n\n`;
 
         helpMessage += `Trigger /${QUESTION_TYPE.TRIVIA} command to start a ${QUESTION_TYPE.TRIVIA} question` + '\n';
         helpMessage += REPLY_MESSAGE + '\n';
@@ -396,9 +396,16 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
   }
 
   private getMessageForProcessing(ctx: any, text: string): string | null {
-    const eqMatch = text.match(/^\s*=\s*(.*)/s);
+    let result: string | null = null;
+    const eqMatch = text.match(/^\s*(?:=\s*(.*)|(.*)\s*=)\s*$/s);
+
     if (eqMatch) {
-      return eqMatch[1].trim() || null;
+      const content = eqMatch[1] || eqMatch[2];
+      result = content ? content.trim() || null : null;
+    }
+
+    if (result) {
+      return result;
     }
 
     const botUsername = this.bot?.botInfo?.username;
