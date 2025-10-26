@@ -20,7 +20,11 @@ export class QuestionService {
   ) { }
 
   async getTotalWrongAnswers(playerId: string | undefined = undefined): Promise<number> {
-    return this.incorrectAnswerModel.countDocuments({ playerId: playerId }).exec();
+    let playersFilter = {};
+    if (playerId) {
+      playersFilter = { playerId: playerId };
+    }
+    return this.incorrectAnswerModel.countDocuments(playersFilter).exec();
   }
 
   async getCorrectAnswersCount(playerId: string | undefined = undefined): Promise<number> {
