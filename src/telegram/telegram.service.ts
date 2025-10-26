@@ -129,11 +129,11 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
         if (player) {
           personalMessage = `👤<b>${player.username}</b>\n`;
 
-          const totalCorrectAnswers = await this.questionService.getCorrectAnswersCount(String(player._id));
-          const totalWrongAnswers = await this.questionService.getTotalWrongAnswers(String(player._id));
+          const playerCorrectAnswers = await this.questionService.getCorrectAnswersCount(String(player._id));
+          const playerWrongAnswers = await this.questionService.getTotalWrongAnswers(String(player._id));
 
-          personalMessage += `- questions answered: <b>${totalCorrectAnswers}</b>\n`;
-          personalMessage += `- wrong answers: <b>${totalGames - totalWrongAnswers}</b>\n`;
+          personalMessage += `- questions answered: <b>${playerCorrectAnswers}</b>\n`;
+          personalMessage += `- wrong answers: <b>${playerWrongAnswers}</b>\n`;
         }
 
         await this.reply(ctx, `${topPlayersMessage}\n\n---\n\n${statsMessage}\n---\n\n${personalMessage}`);
