@@ -77,7 +77,7 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
 
         helpMessage += `Trigger /${QUESTION_TYPE.TRIVIA} command to start a ${QUESTION_TYPE.TRIVIA} question` + '\n';
         helpMessage += REPLY_MESSAGE + '\n';
-        helpMessage += 'Answering wrong or after clues reduces your gained score' + '\n';
+        helpMessage += 'Incorrect answers or answers after hints reduce the points received' + '\n';
         helpMessage += '\n' + this.getJoinLinkMessage();
 
         await this.reply(ctx, helpMessage);
