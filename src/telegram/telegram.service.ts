@@ -103,7 +103,7 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
           topPlayersMessage += '🫙 No scores yet. Play some games!';
         } else {
           const lines = top.map((t, i) => `${i + 1}. ${t.username ?? t.telegramId}: <b>${t.totalScore}</b>`);
-          topPlayersMessage += '🏆 Leaderboard\n';
+          topPlayersMessage += '🏆 <b>Leaderboard</b>\n';
           topPlayersMessage += lines.join('\n');
         }
 
@@ -113,12 +113,23 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
         const totalWrongAnswers = await this.questionService.getTotalWrongAnswers();
         const totalCorrectAnswers = await this.questionService.getCorrectAnswersCount();
 
-        let statsMessage = '📊Total Stats\n';
+        // TODO make common function
+        const answeredPercentage = (totalGames > 0)
+          ? (totalCorrectAnswers / totalGames) * 100
+          : 0;
+        const AnsweredFormattedPercentage = answeredPercentage.toFixed(2);
+
+        const unansweredPercentage = (totalGames > 0)
+          ? ((totalGames - totalCorrectAnswers) / totalGames) * 100
+          : 0;
+        const unansweredFormattedPercentage = unansweredPercentage.toFixed(2);
+
+        let statsMessage = '📊 <b>Total Stats</b>\n';
         statsMessage += `- total questions: <b>${totalQuestions}</b>\n`;
         statsMessage += `- total players: <b>${totalPlayers}</b>\n`;
         statsMessage += `- total questions played: <b>${totalGames}</b>\n`;
-        statsMessage += `- total questions answered: <b>${totalCorrectAnswers}</b>\n`;
-        statsMessage += `- total questions unanswered: <b>${totalGames - totalCorrectAnswers}</b>\n`;
+        statsMessage += `- total questions answered: <b>${totalCorrectAnswers}</b> [${AnsweredFormattedPercentage}%]\n`;
+        statsMessage += `- total unanswered questions: <b>${totalGames - totalCorrectAnswers}</b> [${unansweredFormattedPercentage}%]\n`;
         statsMessage += `- total wrong answers: <b>${totalWrongAnswers}</b>\n`;
 
 
@@ -127,7 +138,7 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
         const player = await this.playerService.findPlayerByTelegramId(ctx.from.id);
 
         if (player) {
-          personalMessage = `👤<b>${player.username}</b>\n`;
+          personalMessage = `👤 <b>${player.username}</b>\n`;
 
           const playerCorrectAnswers = await this.questionService.getCorrectAnswersCount(String(player._id));
           const playerWrongAnswers = await this.questionService.getTotalWrongAnswers(String(player._id));
