@@ -131,7 +131,7 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
         let statsMessage = '📊 <b>Answers</b>\n';
         statsMessage += `- total questions played: <b>${totalGames}</b>\n`;
         statsMessage += `- total questions answered: <b>${totalCorrectAnswers}</b> [${AnsweredFormattedPercentage}%]\n`;
-        statsMessage += `- total unanswered questions: <b>${totalGames - totalCorrectAnswers}</b> [${unansweredFormattedPercentage}%]\n`;
+        //statsMessage += `- total unanswered questions: <b>${totalGames - totalCorrectAnswers}</b> [${unansweredFormattedPercentage}%]\n`;
         statsMessage += `- total wrong answers: <b>${totalWrongAnswers}</b>\n`;
 
         let personalMessage = '';
