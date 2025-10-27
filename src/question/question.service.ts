@@ -41,40 +41,60 @@ export class QuestionService {
   }
 
   async getRandomQuestion(type: QUESTION_TYPE): Promise<Question> {
-    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const neverAskedCount = await this.questionModel.countDocuments({
+      isDeleted: false,
+      type: String(type),
+      lastAskedAt: { $eq: null }
+    }).exec();
 
-    const pipeline = [
-      {
-        $match: {
-          $or: [
-            { lastAskedAt: { $lt: twentyFourHoursAgo } },
-            { lastAskedAt: { $eq: null } }
-          ],
+    if (neverAskedCount > 0) {
+      const randomSkip = Math.floor(Math.random() * neverAskedCount);
+      const neverAskedQuestion = await this.questionModel
+        .findOne({
           isDeleted: false,
-          type: String(type)
-        },
-      },
-      {
-        $sample: { size: 1 }
-      }
-    ];
-
-    const result = await this.questionModel.aggregate(pipeline).exec();
-
-    if (result.length === 0) {
-      const oldestQuestion = await this.questionModel
-        .findOne({ isDeleted: false })
-        .sort({ lastAskedAt: 1 })
+          type: String(type),
+          lastAskedAt: { $eq: null }
+        })
+        .skip(randomSkip)
         .exec();
 
-      if (oldestQuestion) {
-        return oldestQuestion;
+      if (neverAskedQuestion) {
+        return neverAskedQuestion;
       }
-
-      this.logger.log('No questions available in the database.');
     }
 
-    return result[0] as Question;
+    const totalAskedCount = await this.questionModel.countDocuments({
+      isDeleted: false,
+      type: String(type),
+      lastAskedAt: { $ne: null }
+    }).exec();
+
+    if (totalAskedCount === 0) {
+      this.logger.log('No questions available in the database.');
+      throw new InternalServerErrorException('No questions available');
+    }
+
+    let poolSize: number;
+    if (totalAskedCount < 1000) {
+      poolSize = Math.max(1, Math.floor(totalAskedCount * 0.2));
+    } else if (totalAskedCount < 10000) {
+      poolSize = Math.floor(totalAskedCount * 0.1);
+    } else {
+      poolSize = Math.min(3000, Math.floor(totalAskedCount * 0.05));
+    }
+
+    const oldestQuestions = await this.questionModel
+      .find({
+        isDeleted: false,
+        type: String(type),
+        lastAskedAt: { $ne: null }
+      })
+      .sort({ lastAskedAt: 1 })
+      .limit(poolSize)
+      .exec();
+
+    const randomIndex = Math.floor(Math.random() * oldestQuestions.length);
+    return oldestQuestions[randomIndex];
   }
 
   public generateClue(question: QuestionDocument, stage: GAME_STAGE): string {
@@ -206,6 +226,129 @@ export class QuestionService {
       { _id: questionId },
       { $set: { lastAskedAt: new Date() } }
     ).exec();
+  }
+
+  /**
+   * Alternative approach: Dynamic pool size based on question count
+   * Scales better with your 100k+ questions
+   */
+  async getRandomQuestionDynamic(type: QUESTION_TYPE): Promise<Question> {
+    const totalQuestions = await this.questionModel.countDocuments({
+      isDeleted: false,
+      type: String(type)
+    }).exec();
+
+    if (totalQuestions === 0) {
+      throw new InternalServerErrorException('No questions available');
+    }
+
+    // Dynamic pool size: 0.5% of total questions, min 100, max 2000
+    const dynamicPoolSize = Math.max(100, Math.min(2000, Math.floor(totalQuestions * 0.005)));
+
+    // Prioritize never-asked questions first
+    const neverAskedCount = await this.questionModel.countDocuments({
+      isDeleted: false,
+      type: String(type),
+      lastAskedAt: { $eq: null }
+    }).exec();
+
+    if (neverAskedCount > 0) {
+      const takeFromNeverAsked = Math.min(neverAskedCount, Math.floor(dynamicPoolSize * 0.7)); // 70% from never-asked
+      const neverAskedQuestions = await this.questionModel
+        .find({
+          isDeleted: false,
+          type: String(type),
+          lastAskedAt: { $eq: null }
+        })
+        .limit(takeFromNeverAsked)
+        .exec();
+
+      const remainingPoolSize = dynamicPoolSize - takeFromNeverAsked;
+      let oldestQuestions: any[] = [];
+
+      if (remainingPoolSize > 0) {
+        oldestQuestions = await this.questionModel
+          .find({
+            isDeleted: false,
+            type: String(type),
+            lastAskedAt: { $ne: null }
+          })
+          .sort({ lastAskedAt: 1 })
+          .limit(remainingPoolSize)
+          .exec();
+      }
+
+      const combinedPool = [...neverAskedQuestions, ...oldestQuestions];
+      const randomIndex = Math.floor(Math.random() * combinedPool.length);
+      return combinedPool[randomIndex];
+    }
+
+    // If no never-asked questions, use your original approach
+    const oldestQuestions = await this.questionModel
+      .find({
+        isDeleted: false,
+        type: String(type)
+      })
+      .sort({ lastAskedAt: 1 })
+      .limit(dynamicPoolSize)
+      .exec();
+
+    const randomIndex = Math.floor(Math.random() * oldestQuestions.length);
+    return oldestQuestions[randomIndex];
+  }
+
+  /**
+   * Percentile-based approach: Always pick from bottom X% of recently asked
+   * Most mathematically sound for large datasets
+   */
+  async getRandomQuestionPercentile(type: QUESTION_TYPE, percentile: number = 0.1): Promise<Question> {
+    const totalQuestions = await this.questionModel.countDocuments({
+      isDeleted: false,
+      type: String(type),
+      lastAskedAt: { $ne: null }
+    }).exec();
+
+    const neverAskedCount = await this.questionModel.countDocuments({
+      isDeleted: false,
+      type: String(type),
+      lastAskedAt: { $eq: null }
+    }).exec();
+
+    // Always prioritize never-asked questions
+    if (neverAskedCount > 0) {
+      const randomSkip = Math.floor(Math.random() * neverAskedCount);
+      const question = await this.questionModel
+        .findOne({
+          isDeleted: false,
+          type: String(type),
+          lastAskedAt: { $eq: null }
+        })
+        .skip(randomSkip)
+        .exec();
+
+      if (question) return question;
+    }
+
+    if (totalQuestions === 0) {
+      throw new InternalServerErrorException('No questions available');
+    }
+
+    // Take bottom X% (oldest) questions
+    const poolSize = Math.floor(totalQuestions * percentile);
+    const actualPoolSize = Math.max(1, poolSize); // At least 1 question
+
+    const oldestQuestions = await this.questionModel
+      .find({
+        isDeleted: false,
+        type: String(type),
+        lastAskedAt: { $ne: null }
+      })
+      .sort({ lastAskedAt: 1 })
+      .limit(actualPoolSize)
+      .exec();
+
+    const randomIndex = Math.floor(Math.random() * oldestQuestions.length);
+    return oldestQuestions[randomIndex];
   }
 
   async create(questionData: Partial<Question>): Promise<Question> {

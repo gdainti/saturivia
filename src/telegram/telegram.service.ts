@@ -484,6 +484,7 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
         );
 
         if (isCorrectMessageText && !text) {
+          // TODO remove or update logic
           await this.reply(ctx, `🚫${REPLY_MESSAGE}`);
           return;
         }
