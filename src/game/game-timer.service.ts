@@ -8,10 +8,17 @@ import { PlayerService } from '../player/player.service';
 import { TelegramService } from 'src/telegram/telegram.service';
 import { GameService } from './game.service';
 
+interface GameTimer {
+  timer: NodeJS.Timeout;
+  gameId: string;
+  expectedStage: GAME_STAGE;
+  createdAt: Date;
+}
+
 @Injectable()
 export class GameTimerService implements OnModuleInit {
   private readonly logger = new Logger(GameTimerService.name);
-  private readonly activeTimers = new Map<string, NodeJS.Timeout>();
+  private readonly activeTimers = new Map<string, GameTimer>();
 
   constructor(
     @InjectModel(Game.name) private gameModel: Model<GameDocument>,
@@ -26,7 +33,7 @@ export class GameTimerService implements OnModuleInit {
   async startTimer(chatId: number, telegramMessageThreadId: number | undefined, questionType: string, currentStage: GAME_STAGE, triggeredPlayerId: string): Promise<void> {
     const gameKey = `${chatId}_${telegramMessageThreadId}`;
 
-    this.clearTimer(gameKey);
+    await this.clearAllTimersForGame(chatId, telegramMessageThreadId);
 
     const nextStage = this.getNextStage(currentStage);
     if (!nextStage) {
@@ -41,40 +48,54 @@ export class GameTimerService implements OnModuleInit {
       return;
     }
 
+    const game = await this.gameModel.findOne({
+      telegramChatId: chatId,
+      telegramMessageThreadId: telegramMessageThreadId,
+      isDeleted: false
+    }).exec();
+
+    if (!game) {
+      this.logger.log(`Game ${gameKey} not found, cannot set timer`);
+      return;
+    }
+
+    const gameId = (game._id as any).toString();
     this.logger.log(`Setting timer for ${gameKey} to advance to ${nextStage} in ${delaySeconds} seconds`);
 
     const timer = setTimeout(async () => {
       try {
-        await this.advanceGame(chatId, telegramMessageThreadId, nextStage, triggeredPlayerId);
-        this.activeTimers.delete(gameKey);
+        await this.advanceGameWithValidation(chatId, telegramMessageThreadId, nextStage, triggeredPlayerId, gameId, currentStage);
       } catch (error) {
         this.logger.error(`Error advancing game ${gameKey}:`, error);
+      } finally {
         this.activeTimers.delete(gameKey);
       }
     }, delaySeconds * 1000);
 
-    this.activeTimers.set(gameKey, timer);
+    const gameTimer: GameTimer = {
+      timer,
+      gameId: gameId,
+      expectedStage: currentStage,
+      createdAt: new Date()
+    };
+
+    this.activeTimers.set(gameKey, gameTimer);
   }
 
-  private clearTimer(gameKey: string): void {
-    const existingTimer = this.activeTimers.get(gameKey);
-    if (existingTimer) {
-      clearTimeout(existingTimer);
-      this.activeTimers.delete(gameKey);
-    }
-  }
-
-
-  async stopTimer(chatId: number, telegramMessageThreadId: number | undefined): Promise<void> {
+  private async clearAllTimersForGame(chatId: number, telegramMessageThreadId: number | undefined): Promise<void> {
     const prefix = `${chatId}_${telegramMessageThreadId}`;
 
-    for (const [key, timer] of this.activeTimers.entries()) {
+    for (const [key, gameTimer] of this.activeTimers.entries()) {
       if (key.startsWith(prefix)) {
-        clearTimeout(timer);
+        clearTimeout(gameTimer.timer);
         this.activeTimers.delete(key);
-        this.logger.log(`Cleared timer ${key} on stopTimer`);
+        this.logger.log(`Cleared timer ${key} during clearAllTimersForGame`);
       }
     }
+  }
+
+  async stopTimer(chatId: number, telegramMessageThreadId: number | undefined): Promise<void> {
+    await this.clearAllTimersForGame(chatId, telegramMessageThreadId);
   }
 
   private getNextStage(currentStage: GAME_STAGE): GAME_STAGE | null {
@@ -90,12 +111,31 @@ export class GameTimerService implements OnModuleInit {
     }
   }
 
-  private async advanceGame(chatId: number, telegramMessageThreadId: number | undefined, newStage: GAME_STAGE, triggeredPlayerId: string): Promise<void> {
+  private async advanceGameWithValidation(
+    chatId: number,
+    telegramMessageThreadId: number | undefined,
+    newStage: GAME_STAGE,
+    triggeredPlayerId: string,
+    expectedGameId: string,
+    expectedCurrentStage: GAME_STAGE
+  ): Promise<void> {
+    const currentGame = await this.gameModel.findOne({
+      telegramChatId: chatId,
+      telegramMessageThreadId: telegramMessageThreadId,
+      isDeleted: false,
+      _id: expectedGameId,
+      stage: expectedCurrentStage
+    }).exec();
+
+    if (!currentGame) {
+      this.logger.log(`Game validation failed for ${chatId}_${telegramMessageThreadId}. Game may have ended or moved to different stage.`);
+      return;
+    }
 
     const question: QuestionDocument | null = await this.gameService.advanceGame(chatId, telegramMessageThreadId, newStage);
 
     if (!question) {
-      this.logger.error(`Cannot set timer, question not found for ${chatId}_${telegramMessageThreadId}`);
+      this.logger.error(`Cannot advance game, question not found for ${chatId}_${telegramMessageThreadId}`);
       return;
     }
 
@@ -103,6 +143,18 @@ export class GameTimerService implements OnModuleInit {
       const resultTimeoutMs = getTimingForStage(question.type, 'RESULT') * 1000;
       const revealTimer = setTimeout(async () => {
         try {
+          const gameStillExists = await this.gameModel.findOne({
+            telegramChatId: chatId,
+            telegramMessageThreadId: telegramMessageThreadId,
+            isDeleted: false,
+            _id: expectedGameId
+          }).exec();
+
+          if (!gameStillExists) {
+            this.logger.log(`Game ${chatId}_${telegramMessageThreadId} no longer exists, skipping reveal`);
+            return;
+          }
+
           await this.stopTimer(chatId, telegramMessageThreadId);
           await this.gameService.revealAnswer(chatId, telegramMessageThreadId, question);
           await this.gameService.endCurrentGame(
@@ -116,17 +168,48 @@ export class GameTimerService implements OnModuleInit {
           );
         } catch (err) {
           this.logger.error(`Error revealing answer for ${chatId}_${telegramMessageThreadId}:`, err);
+        } finally {
+          this.activeTimers.delete(`${chatId}_${telegramMessageThreadId}_end`);
         }
       }, resultTimeoutMs);
 
-      this.activeTimers.set(`${chatId}_${telegramMessageThreadId}_end`, revealTimer);
+      const endTimer: GameTimer = {
+        timer: revealTimer,
+        gameId: expectedGameId,
+        expectedStage: newStage,
+        createdAt: new Date()
+      };
+
+      this.activeTimers.set(`${chatId}_${telegramMessageThreadId}_end`, endTimer);
     } else {
       await this.startTimer(chatId, telegramMessageThreadId, question.type, newStage, triggeredPlayerId);
     }
   }
 
-  async endGame(telegramChatId: number, telegramMessageThreadId: number | undefined): Promise<void> {
+  private async advanceGame(chatId: number, telegramMessageThreadId: number | undefined, newStage: GAME_STAGE, triggeredPlayerId: string): Promise<void> {
+    // Legacy method for backward compatibility - now uses validation
+    const game = await this.gameModel.findOne({
+      telegramChatId: chatId,
+      telegramMessageThreadId: telegramMessageThreadId,
+      isDeleted: false
+    }).exec();
 
+    if (!game) {
+      this.logger.log(`Game ${chatId}_${telegramMessageThreadId} not found for legacy advance`);
+      return;
+    }
+
+    await this.advanceGameWithValidation(
+      chatId,
+      telegramMessageThreadId,
+      newStage,
+      triggeredPlayerId,
+      (game._id as any).toString(),
+      game.stage
+    );
+  }
+
+  async endGame(telegramChatId: number, telegramMessageThreadId: number | undefined): Promise<void> {
     try {
       const game = await this.gameModel
         .findOne({
@@ -142,9 +225,7 @@ export class GameTimerService implements OnModuleInit {
         return;
       }
 
-      await this.stopTimer(telegramChatId, telegramMessageThreadId);
-      const endTimerKey = `${telegramChatId}_${telegramMessageThreadId}_end`;
-      this.clearTimer(endTimerKey);
+      await this.clearAllTimersForGame(telegramChatId, telegramMessageThreadId);
 
       await this.gameModel.deleteOne(
         { telegramChatId: telegramChatId, telegramMessageThreadId: telegramMessageThreadId }
@@ -213,5 +294,41 @@ export class GameTimerService implements OnModuleInit {
 
   getActiveTimerKeys(): string[] {
     return Array.from(this.activeTimers.keys());
+  }
+
+  getActiveTimerInfo(): Array<{ key: string; gameId: string; expectedStage: GAME_STAGE; createdAt: Date }> {
+    return Array.from(this.activeTimers.entries()).map(([key, timer]) => ({
+      key,
+      gameId: timer.gameId,
+      expectedStage: timer.expectedStage,
+      createdAt: timer.createdAt
+    }));
+  }
+
+  async cleanupOrphanedTimers(): Promise<void> {
+    const timerEntries = Array.from(this.activeTimers.entries());
+    let cleanedCount = 0;
+
+    for (const [key, gameTimer] of timerEntries) {
+      try {
+        const gameExists = await this.gameModel.findOne({
+          _id: gameTimer.gameId,
+          isDeleted: false
+        }).exec();
+
+        if (!gameExists) {
+          clearTimeout(gameTimer.timer);
+          this.activeTimers.delete(key);
+          cleanedCount++;
+          this.logger.log(`Cleaned up orphaned timer ${key} for non-existent game ${gameTimer.gameId}`);
+        }
+      } catch (error) {
+        this.logger.error(`Error checking game existence for timer ${key}:`, error);
+      }
+    }
+
+    if (cleanedCount > 0) {
+      this.logger.log(`Cleaned up ${cleanedCount} orphaned timers`);
+    }
   }
 }
