@@ -90,11 +90,29 @@ export class GameService {
     const correctAnswer = (game.question as any).answer as string;
     if (!correctAnswer) return false;
 
-    const normalize = (input: string) => {
+    const normalize = (input: string): string => {
       let s = input.trim().toLowerCase();
+
       s = s.replace(/^["'“”«»〞⹂]+|["'“”«»〞⹂]+$/g, '');
+
       s = s.replace(/[.!?]+$/g, '');
+
       s = s.replace(/ё/gi, 'е');
+      s = s.replace(/е́/gi, 'е');
+
+      s = s.replace(/а́/gi, 'а');
+      s = s.replace(/и́/gi, 'и');
+      s = s.replace(/о́/gi, 'о');
+      s = s.replace(/у́/gi, 'у');
+      s = s.replace(/ы́/gi, 'ы');
+      s = s.replace(/э́/gi, 'э');
+      s = s.replace(/ю́/gi, 'ю');
+      s = s.replace(/я́/gi, 'я');
+
+      s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+      s = s.replace(/'/g, '');
+
       return s.trim();
     };
 

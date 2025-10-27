@@ -283,7 +283,7 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
   }
 
   public renderClue(hint: string): string {
-    const words = hint.split(/\s+/).filter(Boolean);
+    const words = hint.split(/[\s-]+/).filter(Boolean);
     const lengths = words.map(word => word.length);
     const lengthsString = lengths.join(' ');
     return `💡 <b>${hint}</b> <code>[${lengthsString}]</code>\n`;
