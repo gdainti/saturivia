@@ -175,7 +175,7 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
           return;
         }
 
-        const player = await this.playerService.findOrCreatePlayer(ctx.from.id, ctx.from.username);
+        const player = await this.playerService.findOrCreatePlayer(ctx.from.id, ctx.from.username || ctx.from.first_name);
         const triggeredPlayerId = String(player._id);
 
         game = await this.gameService.startNewGame(chatId, telegramMessageThreadId, QUESTION_TYPE.TRIVIA, triggeredPlayerId);
