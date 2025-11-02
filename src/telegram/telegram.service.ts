@@ -139,7 +139,7 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
         const player = await this.playerService.findPlayerByTelegramId(ctx.from.id);
 
         if (player) {
-          personalMessage = `👤 <b>${player.username}</b>\n`;
+          personalMessage = `👤 <b>${this.mentionUserByTelegramId(ctx.from.id, ctx.from.username, ctx.from.first_name)}</b>\n`;
 
           const playerCorrectAnswers = await this.questionService.getCorrectAnswersCount(String(player._id));
           const playerWrongAnswers = await this.questionService.getTotalWrongAnswers(String(player._id));
@@ -284,8 +284,14 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
 
   public renderClue(hint: string): string {
     const words = hint.split(/[\s-]+/).filter(Boolean);
-    const lengths = words.map(word => word.length);
+
+    const lengths = words.map(word => {
+      const cleaned = this.stripPunctuation(word);
+      return cleaned.length > 0 ? cleaned.length : null;
+    }).filter(length => length !== null) as number[];
+
     const lengthsString = lengths.join(' ');
+
     return `💡 <b>${hint}</b> <code>[${lengthsString}]</code>\n`;
   }
 
@@ -422,6 +428,10 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
     return null;
   }
 
+  private stripPunctuation(text: string): string {
+    return text.replace(/[.,!?:;"'()\[\]{}]/g, '');
+  }
+
   private trimBotMention(text: string, botUsername: string | undefined): string {
     if (!botUsername) {
       return text;
@@ -429,7 +439,7 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
     const escapedUsername = botUsername.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
     const mentionRegex = new RegExp(`\s*@?${escapedUsername}[\\s,:]*`, 'gi');
     let result = text.replace(mentionRegex, ' ');
-    result = result.replace(/\s+([!,.?;:])/g, '$1');
+    result = this.stripPunctuation(result);
     result = result.replace(/\s+/g, ' ').trim();
     return result;
   }
@@ -519,7 +529,7 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
           const score = this.gameService.getScoreFromStage(game.question.difficulty, game.stage, wrongAnswers);
           const randomReaction = CORRECT_ANSWER_REACTIONS[Math.floor(Math.random() * CORRECT_ANSWER_REACTIONS.length)];
           this.bot?.telegram.setMessageReaction(telegramChatId, ctx.message.message_id, [randomReaction]);
-          const mentionUser = this.mentionUserByTelegramId(ctx.from.id, ctx.from.username);
+          const mentionUser = this.mentionUserByTelegramId(ctx.from.id, ctx.from.username, ctx.from.first_name);
           await this.reply(ctx, `${(randomReaction as { emoji: string }).emoji} <i>${originalAnswer}</i>\n\n---\n${mentionUser}: +${score} points\n${this.getPlayAgainLink(game.question.type)}`);
           await this.gameService.endCurrentGame(
             telegramChatId,
@@ -553,12 +563,12 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
     });
   }
 
-  public mentionUserByTelegramId(id: string | number, name: string | undefined) {
+  public mentionUserByTelegramId(id: string | number, name: string | undefined, first_name: string | undefined) {
     if (!id) {
-      return name || 'Player';
+      return name || first_name || 'Player';
     }
 
-    const mention = id.toString().startsWith('@') ? id : `<a href="tg://user?id=${id}">${name}</a>`;
+    const mention = id.toString().startsWith('@') ? id : `<a href="tg://user?id=${id}">${name || first_name || id}</a>`;
     return `${mention}`;
   }
 

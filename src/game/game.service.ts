@@ -109,6 +109,9 @@ export class GameService {
       s = s.replace(/ю́/gi, 'ю');
       s = s.replace(/я́/gi, 'я');
 
+      // э -> e ?
+      //s = s.replace(/э/gi, 'е');
+
       s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
       s = s.replace(/'/g, '');
