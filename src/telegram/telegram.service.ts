@@ -139,7 +139,7 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
         const player = await this.playerService.findPlayerByTelegramId(ctx.from.id);
 
         if (player) {
-          personalMessage = `👤 <b>${this.mentionUserByTelegramId(ctx.from.id, ctx.from.username, ctx.from.first_name)}</b>\n`;
+          personalMessage = `👤 <b>${this.mentionUserByTelegramId(ctx.from.id, ctx.from.username, ctx.from.first_name || ctx.from.last_name)}</b>\n`;
 
           const playerCorrectAnswers = await this.questionService.getCorrectAnswersCount(String(player._id));
           const playerWrongAnswers = await this.questionService.getTotalWrongAnswers(String(player._id));
@@ -175,7 +175,7 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
           return;
         }
 
-        const player = await this.playerService.findOrCreatePlayer(ctx.from.id, ctx.from.username || ctx.from.first_name);
+        const player = await this.playerService.findOrCreatePlayer(ctx.from.id, ctx.from.username || ctx.from.first_name || ctx.from.last_name);
         const triggeredPlayerId = String(player._id);
 
         game = await this.gameService.startNewGame(chatId, telegramMessageThreadId, QUESTION_TYPE.TRIVIA, triggeredPlayerId);
@@ -529,7 +529,7 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
           const score = this.gameService.getScoreFromStage(game.question.difficulty, game.stage, wrongAnswers);
           const randomReaction = CORRECT_ANSWER_REACTIONS[Math.floor(Math.random() * CORRECT_ANSWER_REACTIONS.length)];
           this.bot?.telegram.setMessageReaction(telegramChatId, ctx.message.message_id, [randomReaction]);
-          const mentionUser = this.mentionUserByTelegramId(ctx.from.id, ctx.from.username, ctx.from.first_name);
+          const mentionUser = this.mentionUserByTelegramId(ctx.from.id, ctx.from.username, ctx.from.first_name || ctx.from.last_name);
           await this.reply(ctx, `${(randomReaction as { emoji: string }).emoji} <i>${originalAnswer}</i>\n\n---\n${mentionUser}: +${score} points\n${this.getPlayAgainLink(game.question.type)}`);
           await this.gameService.endCurrentGame(
             telegramChatId,
@@ -563,12 +563,12 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
     });
   }
 
-  public mentionUserByTelegramId(id: string | number, name: string | undefined, first_name: string | undefined) {
+  public mentionUserByTelegramId(id: string | number, username: string | undefined, name: string | undefined) {
     if (!id) {
-      return name || first_name || 'Player';
+      return username || name || 'Player';
     }
 
-    const mention = id.toString().startsWith('@') ? id : `<a href="tg://user?id=${id}">${name || first_name || id}</a>`;
+    const mention = id.toString().startsWith('@') ? id : `<a href="tg://user?id=${id}">${username || name || id}</a>`;
     return `${mention}`;
   }
 
