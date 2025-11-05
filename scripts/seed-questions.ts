@@ -19,6 +19,7 @@ async function run() {
   let txtFiles: string[] = [];
 
   // Check for --clean / -c flag
+  // npm run seed -- --clean
   const cleanFlagIndex = args.findIndex(a => a === '--clean' || a === '-c');
 
   const doClean = cleanFlagIndex !== -1;
