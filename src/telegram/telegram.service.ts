@@ -45,6 +45,10 @@ const CORRECT_ANSWER_REACTIONS: ReactionType[] = [
   { type: 'emoji', emoji: '🤝' },
 ];
 
+const INVALID_ANSWER_REACTIONS: ReactionType[] = [
+  { type: 'emoji', emoji: '💔' }
+];
+
 const REPLY_MESSAGE = 'To submit your answer: reply or mention the bot or start your message with "="';
 
 interface BotCommand {
@@ -58,6 +62,7 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
   private readonly logger = new Logger(TelegramService.name);
   private bot: Telegraf | null = null;
   private isScriptMode: boolean = false;
+  private cachedLeaderboard: Array<{ playerId: string; totalScore: number; username?: string; telegramId?: number }> = [];
 
   constructor(
     private configService: ConfigService,
@@ -96,7 +101,7 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
       description: 'View game statistics',
       action: async (ctx) => {
 
-        const top = await this.playerService.getTopPlayers(10);
+        const top = await this.getCachedLeaderboard();
         let topPlayersMessage = '';
 
         if (!top || top.length === 0) {
@@ -105,9 +110,7 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
           const lines = top.map((t, i) => `${i + 1}. ${t.username ?? t.telegramId}: <b>${t.totalScore.toFixed(2)}</b>`);
           topPlayersMessage += '🏆 <b>Leaderboard</b>\n';
           topPlayersMessage += lines.join('\n');
-        }
-
-        const totalQuestions = await this.questionService.getTotalQuestions();
+        }        const totalQuestions = await this.questionService.getTotalQuestions();
         const totalPlayers = await this.playerService.getTotalPlayers();
         const totalGames = await this.questionService.getTotalHistoryQuestions();
         const totalWrongAnswers = await this.questionService.getTotalWrongAnswers();
@@ -230,6 +233,9 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
 
     try {
       this.init();
+      this.getCachedLeaderboard().catch(err =>
+        this.logger.error('Failed to pre-populate leaderboard cache', err)
+      );
     }
     catch (err) {
       this.logger.error('Failed to initialize Telegram bot', err);
@@ -494,8 +500,7 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
         );
 
         if (isCorrectMessageText && !text) {
-          // TODO remove or update logic
-          await this.reply(ctx, `🚫${REPLY_MESSAGE}`);
+          this.bot?.telegram.setMessageReaction(telegramChatId, ctx.message.message_id, INVALID_ANSWER_REACTIONS);
           return;
         }
 
@@ -527,10 +532,14 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
           );
 
           const score = this.gameService.getScoreFromStage(game.question.difficulty, game.stage, wrongAnswers);
+
+          const leaderboardBefore = await this.getCachedLeaderboard();
+
           const randomReaction = CORRECT_ANSWER_REACTIONS[Math.floor(Math.random() * CORRECT_ANSWER_REACTIONS.length)];
           this.bot?.telegram.setMessageReaction(telegramChatId, ctx.message.message_id, [randomReaction]);
           const mentionUser = this.mentionUserByTelegramId(ctx.from.id, ctx.from.username, ctx.from.first_name || ctx.from.last_name);
           await this.reply(ctx, `${(randomReaction as { emoji: string }).emoji} <i>${originalAnswer}</i>\n\n---\n${mentionUser}: +${score} points\n${this.getPlayAgainLink(game.question.type)}`);
+
           await this.gameService.endCurrentGame(
             telegramChatId,
             telegramMessageThreadId,
@@ -540,11 +549,18 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
             String(game.triggeredPlayerId),
             game.stage
           );
-          // TODO show scoreboard if player entered scoreboard
+
+          await this.checkAndSendLeaderboardUpdate(
+            telegramChatId,
+            telegramMessageThreadId,
+            leaderboardBefore,
+            String(player._id),
+            score,
+            player.username,
+            player.telegramId
+          );
 
         } else {
-          // incorrect answer
-
           this.questionService.saveIncorrectAnswer(
             telegramChatId,
             telegramMessageThreadId,
@@ -633,5 +649,134 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
     } else {
       this.logger.warn('Bot not initialized. Cannot send message.');
     }
+  }
+
+  private async getCachedLeaderboard(): Promise<Array<{ playerId: string; totalScore: number; username?: string; telegramId?: number }>> {
+    if (this.cachedLeaderboard.length === 0) {
+      this.cachedLeaderboard = await this.playerService.getTopPlayers(10);
+    }
+
+    return [...this.cachedLeaderboard];
+  }
+
+  private async updateCachedLeaderboard(winnerPlayerId: string, scoreToAdd: number, winnerUsername?: string, winnerTelegramId?: number): Promise<void> {
+    const winnerIndex = this.cachedLeaderboard.findIndex(p => String(p.playerId) === winnerPlayerId);
+
+    if (winnerIndex !== -1) {
+      this.cachedLeaderboard[winnerIndex].totalScore += scoreToAdd;
+      if (winnerUsername) {
+        this.cachedLeaderboard[winnerIndex].username = winnerUsername;
+      }
+    } else {
+      const freshLeaderboard = await this.playerService.getTopPlayers(15);
+      const winnerInFreshData = freshLeaderboard.find(p => String(p.playerId) === winnerPlayerId);
+
+      if (winnerInFreshData) {
+        this.cachedLeaderboard.push({
+          playerId: winnerPlayerId,
+          totalScore: winnerInFreshData.totalScore,
+          username: winnerInFreshData.username,
+          telegramId: winnerInFreshData.telegramId
+        });
+      } else {
+        this.cachedLeaderboard.push({
+          playerId: winnerPlayerId,
+          totalScore: scoreToAdd,
+          username: winnerUsername,
+          telegramId: winnerTelegramId
+        });
+      }
+    }
+
+    this.removeDuplicatesFromCache();
+    this.cachedLeaderboard.sort((a, b) => b.totalScore - a.totalScore);
+    this.cachedLeaderboard = this.cachedLeaderboard.slice(0, 10);
+  }
+
+  private removeDuplicatesFromCache(): void {
+    const playerMap = new Map<string, { playerId: string; totalScore: number; username?: string; telegramId?: number }>();
+
+    for (const player of this.cachedLeaderboard) {
+      const playerIdStr = String(player.playerId);
+      const existing = playerMap.get(playerIdStr);
+      if (!existing || existing.totalScore < player.totalScore) {
+        playerMap.set(playerIdStr, player);
+      }
+    }
+
+    this.cachedLeaderboard = Array.from(playerMap.values());
+  }
+
+  private clearLeaderboardCache(): void {
+    this.cachedLeaderboard = [];
+  }
+
+  private async checkAndSendLeaderboardUpdate(
+    chatId: number,
+    telegramMessageThreadId: number | undefined,
+    leaderboardBefore: Array<{ playerId: string; totalScore: number; username?: string; telegramId?: number }>,
+    winnerPlayerId: string,
+    scoreToAdd: number,
+    winnerUsername?: string,
+    winnerTelegramId?: number
+  ): Promise<void> {
+    try {
+      await this.updateCachedLeaderboard(winnerPlayerId, scoreToAdd, winnerUsername, winnerTelegramId);
+
+      const leaderboardAfter = await this.getCachedLeaderboard();
+
+      const positionsChanged = this.hasLeaderboardChanged(leaderboardBefore, leaderboardAfter, winnerPlayerId);
+
+      if (positionsChanged) {
+        const leaderboardMessage = this.formatLeaderboardMessage(leaderboardAfter);
+
+        await this.sendMessage(chatId, telegramMessageThreadId, `\n🏆 <b>Leaderboard Updated!</b>\n${leaderboardMessage}`);
+      }
+    } catch (error) {
+      this.logger.error('Error checking leaderboard changes:', error);
+    }
+  }
+
+  private hasLeaderboardChanged(
+    before: Array<{ playerId: string; totalScore: number; username?: string; telegramId?: number }>,
+    after: Array<{ playerId: string; totalScore: number; username?: string; telegramId?: number }>,
+    winnerPlayerId: string
+  ): boolean {
+    const winnerBeforeIndex = before.findIndex(p => String(p.playerId) === winnerPlayerId);
+    const winnerAfterIndex = after.findIndex(p => String(p.playerId) === winnerPlayerId);
+
+    if (winnerBeforeIndex === -1 && winnerAfterIndex !== -1) {
+      return true;
+    }
+
+    if (winnerBeforeIndex !== -1 && winnerAfterIndex !== -1 && winnerAfterIndex < winnerBeforeIndex) {
+      return true;
+    }
+
+    if (before.length !== after.length) {
+      return true;
+    }
+
+    for (let i = 0; i < Math.min(before.length, after.length); i++) {
+      if (String(before[i].playerId) !== String(after[i].playerId)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private formatLeaderboardMessage(leaderboard: Array<{ playerId: string; totalScore: number; username?: string; telegramId?: number }>): string {
+    if (!leaderboard || leaderboard.length === 0) {
+      return '🫙 No scores yet. Play some games!';
+    }
+
+    const lines = leaderboard.map((player, index) => {
+      const position = index + 1;
+      const username = player.username ?? player.telegramId;
+      return `${position}. ${username}: <b>${player.totalScore.toFixed(2)}</b>`;
+    });
+
+    return lines.join('\n');
   }
 }
