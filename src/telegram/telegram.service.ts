@@ -102,7 +102,7 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
         if (!top || top.length === 0) {
           topPlayersMessage += '🫙 No scores yet. Play some games!';
         } else {
-          const lines = top.map((t, i) => `${i + 1}. ${t.username ?? t.telegramId}: <b>${t.totalScore}</b>`);
+          const lines = top.map((t, i) => `${i + 1}. ${t.username ?? t.telegramId}: <b>${t.totalScore.toFixed(2)}</b>`);
           topPlayersMessage += '🏆 <b>Leaderboard</b>\n';
           topPlayersMessage += lines.join('\n');
         }

@@ -46,6 +46,7 @@ export class QuestionHistory {
   telegramMessageThreadId: number;
 
   @Prop({
+    type: String,
     required: false,
     enum: Object.values(GAME_STAGE),
     default: null

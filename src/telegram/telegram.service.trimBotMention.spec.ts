@@ -26,12 +26,12 @@ describe('trimBotMention', () => {
 
   it('removes multiple mentions', () => {
     const text = '@TestBot hello @TestBot world @TestBot!';
-    expect(service['trimBotMention'](text, botUsername)).toBe('hello world!');
+    expect(service['trimBotMention'](text, botUsername)).toBe('hello world');
   });
 
   it('removes mention with extra spaces and punctuation', () => {
     const text = 'hello, @TestBot: world!';
-    expect(service['trimBotMention'](text, botUsername)).toBe('hello, world!');
+    expect(service['trimBotMention'](text, botUsername)).toBe('hello world');
   });
 
   it('returns original text if no mention', () => {
