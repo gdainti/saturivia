@@ -101,7 +101,9 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
       description: 'View game statistics',
       action: async (ctx) => {
 
-        const top = await this.getCachedLeaderboard();
+        // TODO check why cachedLeaderboard was not updating
+        // const top = await this.getCachedLeaderboard();
+        const top = await this.playerService.getTopPlayers(10);
         let topPlayersMessage = '';
 
         if (!top || top.length === 0) {
@@ -110,7 +112,9 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
           const lines = top.map((t, i) => `${i + 1}. ${t.username ?? t.telegramId}: <b>${t.totalScore.toFixed(2)}</b>`);
           topPlayersMessage += '🏆 <b>Leaderboard</b>\n';
           topPlayersMessage += lines.join('\n');
-        }        const totalQuestions = await this.questionService.getTotalQuestions();
+        }
+
+        const totalQuestions = await this.questionService.getTotalQuestions();
         const totalPlayers = await this.playerService.getTotalPlayers();
         const totalGames = await this.questionService.getTotalHistoryQuestions();
         const totalWrongAnswers = await this.questionService.getTotalWrongAnswers();
