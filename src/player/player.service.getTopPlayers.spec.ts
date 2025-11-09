@@ -8,12 +8,17 @@ describe('PlayerService (getTopPlayers)', () => {
   let service: PlayerService;
 
   beforeEach(async () => {
-  const mockedExec = jest.fn().mockResolvedValue([{ playerId: '1', totalScore: 3, username: 'alice' }]);
+    const mockedExec = jest
+      .fn()
+      .mockResolvedValue([{ playerId: '1', totalScore: 3, username: 'alice' }]);
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PlayerService,
         { provide: getModelToken(Player.name), useValue: {} },
-        { provide: getModelToken(QuestionHistory.name), useValue: { aggregate: () => ({ exec: mockedExec }) } },
+        {
+          provide: getModelToken(QuestionHistory.name),
+          useValue: { aggregate: () => ({ exec: mockedExec }) },
+        },
       ],
     }).compile();
 

@@ -8,19 +8,19 @@ export enum GAME_STAGE {
   CLUE_1 = 'CLUE_1', // first clue
   CLUE_2 = 'CLUE_2', // second clue
   RESULT = 'RESULT', // show answer
-};
+}
 
 export type GameDocument = Game & Document;
 
 @Schema({
   timestamps: true,
-  collection: 'games'
+  collection: 'games',
 })
 export class Game {
   @Prop({
     type: MongooseSchema.Types.ObjectId,
     ref: 'Question',
-    required: true
+    required: true,
   })
   question: Question;
 
@@ -33,7 +33,7 @@ export class Game {
   @Prop({
     required: true,
     enum: Object.values(GAME_STAGE),
-    default: GAME_STAGE.CLUE_0
+    default: GAME_STAGE.CLUE_0,
   })
   stage: GAME_STAGE;
 
@@ -41,7 +41,7 @@ export class Game {
     type: MongooseSchema.Types.ObjectId,
     ref: 'Player',
     required: false,
-    default: null
+    default: null,
   })
   guesser: Player;
 
@@ -49,7 +49,7 @@ export class Game {
     type: MongooseSchema.Types.ObjectId,
     ref: 'Player',
     required: false,
-    index: true
+    index: true,
   })
   triggeredPlayerId: Player;
 

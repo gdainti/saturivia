@@ -6,8 +6,14 @@ import { Game, GameSchema } from 'src/game/game.schema';
 import { QuestionModule } from 'src/question/question.module';
 import { PlayerModule } from 'src/player/player.module';
 import { TelegramModule } from 'src/telegram/telegram.module';
-import { QuestionHistory, QuestionHistorySchema } from 'src/question/question-history.schema';
-import { IncorrectAnswer, IncorrectAnswerSchema } from 'src/question/incorrect-answer.schema';
+import {
+  QuestionHistory,
+  QuestionHistorySchema,
+} from 'src/question/question-history.schema';
+import {
+  IncorrectAnswer,
+  IncorrectAnswerSchema,
+} from 'src/question/incorrect-answer.schema';
 
 @Module({
   imports: [
@@ -21,6 +27,6 @@ import { IncorrectAnswer, IncorrectAnswerSchema } from 'src/question/incorrect-a
     forwardRef(() => TelegramModule),
   ],
   providers: [GameService, GameTimerService],
-  exports: [GameService, GameTimerService]
+  exports: [GameService, GameTimerService],
 })
-export class GameModule { }
+export class GameModule {}

@@ -1,12 +1,22 @@
 // ...existing code...
-import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { GAME_STAGE } from 'src/game/game.schema';
 import { Question, QuestionDocument } from 'src/question/question.schema';
-import { QuestionHistory, QuestionHistoryDocument } from './question-history.schema';
+import {
+  QuestionHistory,
+  QuestionHistoryDocument,
+} from './question-history.schema';
 import { QUESTION_TYPE } from './question-type';
-import { IncorrectAnswer, IncorrectAnswerDocument } from 'src/question/incorrect-answer.schema';
+import {
+  IncorrectAnswer,
+  IncorrectAnswerDocument,
+} from 'src/question/incorrect-answer.schema';
 
 export const MASK_CHARACTER = '●';
 @Injectable()
@@ -15,11 +25,15 @@ export class QuestionService {
 
   constructor(
     @InjectModel(Question.name) private questionModel: Model<QuestionDocument>,
-    @InjectModel(QuestionHistory.name) private questionHistoryModel: Model<QuestionHistoryDocument>,
-    @InjectModel(IncorrectAnswer.name) private incorrectAnswerModel: Model<IncorrectAnswerDocument>,
-  ) { }
+    @InjectModel(QuestionHistory.name)
+    private questionHistoryModel: Model<QuestionHistoryDocument>,
+    @InjectModel(IncorrectAnswer.name)
+    private incorrectAnswerModel: Model<IncorrectAnswerDocument>,
+  ) {}
 
-  async getTotalWrongAnswers(playerId: string | undefined = undefined): Promise<number> {
+  async getTotalWrongAnswers(
+    playerId: string | undefined = undefined,
+  ): Promise<number> {
     let playersFilter = {};
     if (playerId) {
       playersFilter = { playerId: playerId };
@@ -27,13 +41,14 @@ export class QuestionService {
     return this.incorrectAnswerModel.countDocuments(playersFilter).exec();
   }
 
-  async getCorrectAnswersCount(playerId: string | undefined = undefined): Promise<number> {
+  async getCorrectAnswersCount(
+    playerId: string | undefined = undefined,
+  ): Promise<number> {
     let playerIdFilter = {};
 
     if (playerId) {
       playerIdFilter = { playerId: playerId };
-    }
-    else {
+    } else {
       playerIdFilter = { playerId: { $exists: true, $ne: null } };
     }
 
@@ -41,11 +56,13 @@ export class QuestionService {
   }
 
   async getRandomQuestion(type: QUESTION_TYPE): Promise<Question> {
-    const neverAskedCount = await this.questionModel.countDocuments({
-      isDeleted: false,
-      type: String(type),
-      lastAskedAt: { $eq: null }
-    }).exec();
+    const neverAskedCount = await this.questionModel
+      .countDocuments({
+        isDeleted: false,
+        type: String(type),
+        lastAskedAt: { $eq: null },
+      })
+      .exec();
 
     if (neverAskedCount > 0) {
       const randomSkip = Math.floor(Math.random() * neverAskedCount);
@@ -53,7 +70,7 @@ export class QuestionService {
         .findOne({
           isDeleted: false,
           type: String(type),
-          lastAskedAt: { $eq: null }
+          lastAskedAt: { $eq: null },
         })
         .skip(randomSkip)
         .exec();
@@ -63,11 +80,13 @@ export class QuestionService {
       }
     }
 
-    const totalAskedCount = await this.questionModel.countDocuments({
-      isDeleted: false,
-      type: String(type),
-      lastAskedAt: { $ne: null }
-    }).exec();
+    const totalAskedCount = await this.questionModel
+      .countDocuments({
+        isDeleted: false,
+        type: String(type),
+        lastAskedAt: { $ne: null },
+      })
+      .exec();
 
     if (totalAskedCount === 0) {
       this.logger.log('No questions available in the database.');
@@ -87,7 +106,7 @@ export class QuestionService {
       .find({
         isDeleted: false,
         type: String(type),
-        lastAskedAt: { $ne: null }
+        lastAskedAt: { $ne: null },
       })
       .sort({ lastAskedAt: 1 })
       .limit(poolSize)
@@ -109,10 +128,11 @@ export class QuestionService {
   public async saveHistoryQuestion(
     telegramChatId: number,
     telegramMessageThreadId: number | undefined,
-    questionId: string, score: number = 0,
+    questionId: string,
+    score: number = 0,
     playerId: string | null = null,
     triggeredPlayerId: string,
-    stage: GAME_STAGE
+    stage: GAME_STAGE,
   ): Promise<QuestionHistory> {
     const historyEntry = await this.questionHistoryModel.create({
       telegramChatId: telegramChatId,
@@ -126,7 +146,13 @@ export class QuestionService {
     return historyEntry;
   }
 
-  public async saveIncorrectAnswer(telegramChatId: number, telegramMessageThreadId: number | undefined, questionId: string, playerId: string, answer: string): Promise<IncorrectAnswer> {
+  public async saveIncorrectAnswer(
+    telegramChatId: number,
+    telegramMessageThreadId: number | undefined,
+    questionId: string,
+    playerId: string,
+    answer: string,
+  ): Promise<IncorrectAnswer> {
     const incorrectAnswerEntry = await this.incorrectAnswerModel.create({
       telegramChatId: telegramChatId,
       telegramMessageThreadId: telegramMessageThreadId,
@@ -143,17 +169,18 @@ export class QuestionService {
     questionId: string,
     playerId: string,
   ): Promise<number> {
-    return this.incorrectAnswerModel.countDocuments({
-      question: questionId,
-      playerId: playerId,
-      telegramChatId: telegramChatId,
-      telegramMessageThreadId: telegramMessageThreadId,
-      isDeleted: false,
-    }).exec();
+    return this.incorrectAnswerModel
+      .countDocuments({
+        question: questionId,
+        playerId: playerId,
+        telegramChatId: telegramChatId,
+        telegramMessageThreadId: telegramMessageThreadId,
+        isDeleted: false,
+      })
+      .exec();
   }
 
   public generateMaskedAnswerClue(answer: string, stage: GAME_STAGE): string {
-
     const ALPHANUMERIC_REGEX = /[\p{L}\p{N}]/u;
     const ALPHANUMERIC_GLOBAL_REGEX = /[\p{L}\p{N}]/gu;
 
@@ -182,7 +209,7 @@ export class QuestionService {
 
     const charsToReveal = Math.min(
       totalChars,
-      Math.max(1, Math.floor(totalChars * revealPercentage))
+      Math.max(1, Math.floor(totalChars * revealPercentage)),
     );
 
     const indicesToReveal = new Set<number>();
@@ -220,12 +247,10 @@ export class QuestionService {
     return maskedAnswer;
   }
 
-
   async markAsAsked(questionId: string): Promise<void> {
-    await this.questionModel.updateOne(
-      { _id: questionId },
-      { $set: { lastAskedAt: new Date() } }
-    ).exec();
+    await this.questionModel
+      .updateOne({ _id: questionId }, { $set: { lastAskedAt: new Date() } })
+      .exec();
   }
 
   /**
@@ -233,32 +258,42 @@ export class QuestionService {
    * Scales better with your 100k+ questions
    */
   async getRandomQuestionDynamic(type: QUESTION_TYPE): Promise<Question> {
-    const totalQuestions = await this.questionModel.countDocuments({
-      isDeleted: false,
-      type: String(type)
-    }).exec();
+    const totalQuestions = await this.questionModel
+      .countDocuments({
+        isDeleted: false,
+        type: String(type),
+      })
+      .exec();
 
     if (totalQuestions === 0) {
       throw new InternalServerErrorException('No questions available');
     }
 
     // Dynamic pool size: 0.5% of total questions, min 100, max 2000
-    const dynamicPoolSize = Math.max(100, Math.min(2000, Math.floor(totalQuestions * 0.005)));
+    const dynamicPoolSize = Math.max(
+      100,
+      Math.min(2000, Math.floor(totalQuestions * 0.005)),
+    );
 
     // Prioritize never-asked questions first
-    const neverAskedCount = await this.questionModel.countDocuments({
-      isDeleted: false,
-      type: String(type),
-      lastAskedAt: { $eq: null }
-    }).exec();
+    const neverAskedCount = await this.questionModel
+      .countDocuments({
+        isDeleted: false,
+        type: String(type),
+        lastAskedAt: { $eq: null },
+      })
+      .exec();
 
     if (neverAskedCount > 0) {
-      const takeFromNeverAsked = Math.min(neverAskedCount, Math.floor(dynamicPoolSize * 0.7)); // 70% from never-asked
+      const takeFromNeverAsked = Math.min(
+        neverAskedCount,
+        Math.floor(dynamicPoolSize * 0.7),
+      ); // 70% from never-asked
       const neverAskedQuestions = await this.questionModel
         .find({
           isDeleted: false,
           type: String(type),
-          lastAskedAt: { $eq: null }
+          lastAskedAt: { $eq: null },
         })
         .limit(takeFromNeverAsked)
         .exec();
@@ -271,7 +306,7 @@ export class QuestionService {
           .find({
             isDeleted: false,
             type: String(type),
-            lastAskedAt: { $ne: null }
+            lastAskedAt: { $ne: null },
           })
           .sort({ lastAskedAt: 1 })
           .limit(remainingPoolSize)
@@ -287,7 +322,7 @@ export class QuestionService {
     const oldestQuestions = await this.questionModel
       .find({
         isDeleted: false,
-        type: String(type)
+        type: String(type),
       })
       .sort({ lastAskedAt: 1 })
       .limit(dynamicPoolSize)
@@ -301,18 +336,25 @@ export class QuestionService {
    * Percentile-based approach: Always pick from bottom X% of recently asked
    * Most mathematically sound for large datasets
    */
-  async getRandomQuestionPercentile(type: QUESTION_TYPE, percentile: number = 0.1): Promise<Question> {
-    const totalQuestions = await this.questionModel.countDocuments({
-      isDeleted: false,
-      type: String(type),
-      lastAskedAt: { $ne: null }
-    }).exec();
+  async getRandomQuestionPercentile(
+    type: QUESTION_TYPE,
+    percentile: number = 0.1,
+  ): Promise<Question> {
+    const totalQuestions = await this.questionModel
+      .countDocuments({
+        isDeleted: false,
+        type: String(type),
+        lastAskedAt: { $ne: null },
+      })
+      .exec();
 
-    const neverAskedCount = await this.questionModel.countDocuments({
-      isDeleted: false,
-      type: String(type),
-      lastAskedAt: { $eq: null }
-    }).exec();
+    const neverAskedCount = await this.questionModel
+      .countDocuments({
+        isDeleted: false,
+        type: String(type),
+        lastAskedAt: { $eq: null },
+      })
+      .exec();
 
     // Always prioritize never-asked questions
     if (neverAskedCount > 0) {
@@ -321,7 +363,7 @@ export class QuestionService {
         .findOne({
           isDeleted: false,
           type: String(type),
-          lastAskedAt: { $eq: null }
+          lastAskedAt: { $eq: null },
         })
         .skip(randomSkip)
         .exec();
@@ -341,7 +383,7 @@ export class QuestionService {
       .find({
         isDeleted: false,
         type: String(type),
-        lastAskedAt: { $ne: null }
+        lastAskedAt: { $ne: null },
       })
       .sort({ lastAskedAt: 1 })
       .limit(actualPoolSize)
@@ -359,7 +401,11 @@ export class QuestionService {
     return this.questionModel.countDocuments({ isDeleted: false }).exec();
   }
 
-  public async getTotalHistoryQuestions(playerId: string | undefined = undefined): Promise<number> {
-    return this.questionHistoryModel.countDocuments({ playerId: playerId }).exec();
+  public async getTotalHistoryQuestions(
+    playerId: string | undefined = undefined,
+  ): Promise<number> {
+    return this.questionHistoryModel
+      .countDocuments({ playerId: playerId })
+      .exec();
   }
 }

@@ -2,7 +2,10 @@ import { Module } from '@nestjs/common';
 import { PlayerService } from './player.service';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Player, PlayerSchema } from 'src/player/player.schema';
-import { QuestionHistory, QuestionHistorySchema } from 'src/question/question-history.schema';
+import {
+  QuestionHistory,
+  QuestionHistorySchema,
+} from 'src/question/question-history.schema';
 
 @Module({
   imports: [
@@ -12,6 +15,6 @@ import { QuestionHistory, QuestionHistorySchema } from 'src/question/question-hi
     ]),
   ],
   providers: [PlayerService],
-  exports: [PlayerService]
+  exports: [PlayerService],
 })
-export class PlayerModule { }
+export class PlayerModule {}

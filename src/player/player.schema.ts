@@ -5,10 +5,9 @@ export type PlayerDocument = Player & Document;
 
 @Schema({
   timestamps: true,
-  collection: 'players'
+  collection: 'players',
 })
 export class Player {
-
   @Prop({ required: true, unique: true, index: true })
   telegramId: number;
 

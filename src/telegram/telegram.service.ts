@@ -1,4 +1,12 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy, Inject, forwardRef, OnApplicationBootstrap } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleInit,
+  OnModuleDestroy,
+  Inject,
+  forwardRef,
+  OnApplicationBootstrap,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Context, Telegraf } from 'telegraf';
 import { QuestionService } from 'src/question/question.service';
@@ -46,10 +54,11 @@ const CORRECT_ANSWER_REACTIONS: ReactionType[] = [
 ];
 
 const INVALID_ANSWER_REACTIONS: ReactionType[] = [
-  { type: 'emoji', emoji: '💔' }
+  { type: 'emoji', emoji: '💔' },
 ];
 
-const REPLY_MESSAGE = 'To submit your answer: reply or mention the bot or start your message with "="';
+const REPLY_MESSAGE =
+  'To submit your answer: reply or mention the bot or start your message with "="';
 
 interface BotCommand {
   command: string;
@@ -58,11 +67,17 @@ interface BotCommand {
 }
 
 @Injectable()
-export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy {
+export class TelegramService
+  implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger(TelegramService.name);
   private bot: Telegraf | null = null;
   private isScriptMode: boolean = false;
-  private cachedLeaderboard: Array<{ playerId: string; totalScore: number; username?: string; telegramId?: number }> = [];
+  private cachedLeaderboard: Array<{
+    playerId: string;
+    totalScore: number;
+    username?: string;
+    telegramId?: number;
+  }> = [];
 
   constructor(
     private configService: ConfigService,
@@ -80,13 +95,17 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
       action: async (ctx) => {
         let helpMessage = `🤖 <b>${this.bot?.botInfo?.username || 'Saturivia'} Bot Help</b> 🪐\n\n`;
 
-        helpMessage += `Trigger /${QUESTION_TYPE.TRIVIA} command to start a ${QUESTION_TYPE.TRIVIA} question` + '\n';
+        helpMessage +=
+          `Trigger /${QUESTION_TYPE.TRIVIA} command to start a ${QUESTION_TYPE.TRIVIA} question` +
+          '\n';
         helpMessage += REPLY_MESSAGE + '\n';
-        helpMessage += 'Incorrect answers or answers after hints reduce the points received' + '\n';
+        helpMessage +=
+          'Incorrect answers or answers after hints reduce the points received' +
+          '\n';
         helpMessage += '\n' + this.getJoinLinkMessage();
 
         await this.reply(ctx, helpMessage);
-      }
+      },
     },
     {
       command: 'version',
@@ -94,13 +113,12 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
       action: async (ctx) => {
         const version = process.env.npm_package_version ?? 'unknown';
         await this.reply(ctx, version);
-      }
+      },
     },
     {
       command: 'stats',
       description: 'View game statistics',
       action: async (ctx) => {
-
         // TODO check why cachedLeaderboard was not updating
         // const top = await this.getCachedLeaderboard();
         const top = await this.playerService.getTopPlayers(10);
@@ -109,26 +127,32 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
         if (!top || top.length === 0) {
           topPlayersMessage += '🫙 No scores yet. Play some games!';
         } else {
-          const lines = top.map((t, i) => `${i + 1}. ${t.username ?? t.telegramId}: <b>${t.totalScore.toFixed(2)}</b>`);
+          const lines = top.map(
+            (t, i) =>
+              `${i + 1}. ${t.username ?? t.telegramId}: <b>${t.totalScore.toFixed(2)}</b>`,
+          );
           topPlayersMessage += '🏆 <b>Leaderboard</b>\n';
           topPlayersMessage += lines.join('\n');
         }
 
         const totalQuestions = await this.questionService.getTotalQuestions();
         const totalPlayers = await this.playerService.getTotalPlayers();
-        const totalGames = await this.questionService.getTotalHistoryQuestions();
-        const totalWrongAnswers = await this.questionService.getTotalWrongAnswers();
-        const totalCorrectAnswers = await this.questionService.getCorrectAnswersCount();
+        const totalGames =
+          await this.questionService.getTotalHistoryQuestions();
+        const totalWrongAnswers =
+          await this.questionService.getTotalWrongAnswers();
+        const totalCorrectAnswers =
+          await this.questionService.getCorrectAnswersCount();
 
         // TODO make common function
-        const answeredPercentage = (totalGames > 0)
-          ? (totalCorrectAnswers / totalGames) * 100
-          : 0;
+        const answeredPercentage =
+          totalGames > 0 ? (totalCorrectAnswers / totalGames) * 100 : 0;
         const AnsweredFormattedPercentage = answeredPercentage.toFixed(2);
 
-        const unansweredPercentage = (totalGames > 0)
-          ? ((totalGames - totalCorrectAnswers) / totalGames) * 100
-          : 0;
+        const unansweredPercentage =
+          totalGames > 0
+            ? ((totalGames - totalCorrectAnswers) / totalGames) * 100
+            : 0;
         const unansweredFormattedPercentage = unansweredPercentage.toFixed(2);
 
         let overallDataMessage = '🗃️<b>Data</b>\n';
@@ -143,20 +167,29 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
 
         let personalMessage = '';
 
-        const player = await this.playerService.findPlayerByTelegramId(ctx.from.id);
+        const player = await this.playerService.findPlayerByTelegramId(
+          ctx.from.id,
+        );
 
         if (player) {
           personalMessage = `👤 <b>${this.mentionUserByTelegramId(ctx.from.id, ctx.from.username, ctx.from.first_name || ctx.from.last_name)}</b>\n`;
 
-          const playerCorrectAnswers = await this.questionService.getCorrectAnswersCount(String(player._id));
-          const playerWrongAnswers = await this.questionService.getTotalWrongAnswers(String(player._id));
+          const playerCorrectAnswers =
+            await this.questionService.getCorrectAnswersCount(
+              String(player._id),
+            );
+          const playerWrongAnswers =
+            await this.questionService.getTotalWrongAnswers(String(player._id));
 
           personalMessage += `- questions answered: <b>${playerCorrectAnswers}</b>\n`;
           personalMessage += `- wrong answers: <b>${playerWrongAnswers}</b>\n`;
         }
 
-        await this.reply(ctx, `${topPlayersMessage}\n\n---\n\n${overallDataMessage}\n---\n\n${statsMessage}\n---\n\n${personalMessage}`);
-      }
+        await this.reply(
+          ctx,
+          `${topPlayersMessage}\n\n---\n\n${overallDataMessage}\n---\n\n${statsMessage}\n---\n\n${personalMessage}`,
+        );
+      },
     },
     {
       command: QUESTION_TYPE.TRIVIA,
@@ -172,7 +205,10 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
 
         let game: Game | null = null;
         try {
-          game = await this.gameService.getGame(chatId, telegramMessageThreadId);
+          game = await this.gameService.getGame(
+            chatId,
+            telegramMessageThreadId,
+          );
         } catch (err) {
           this.logger.error('Error checking existing game', err);
         }
@@ -182,10 +218,18 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
           return;
         }
 
-        const player = await this.playerService.findOrCreatePlayer(ctx.from.id, ctx.from.username || ctx.from.first_name || ctx.from.last_name);
+        const player = await this.playerService.findOrCreatePlayer(
+          ctx.from.id,
+          ctx.from.username || ctx.from.first_name || ctx.from.last_name,
+        );
         const triggeredPlayerId = String(player._id);
 
-        game = await this.gameService.startNewGame(chatId, telegramMessageThreadId, QUESTION_TYPE.TRIVIA, triggeredPlayerId);
+        game = await this.gameService.startNewGame(
+          chatId,
+          telegramMessageThreadId,
+          QUESTION_TYPE.TRIVIA,
+          triggeredPlayerId,
+        );
         if (!game || !game.question?.question || !game.question?.answer) {
           await this.reply(ctx, '❌ Error: could not start a new game.');
           return;
@@ -198,13 +242,16 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
           ctx,
           this.renderQuestionMessage(
             question,
-            this.questionService.generateClue(game.question as QuestionDocument, game.stage),
+            this.questionService.generateClue(
+              game.question as QuestionDocument,
+              game.stage,
+            ),
             game.question.difficulty,
             game.question.category,
-            game.question.answer
+            game.question.answer,
           ),
         );
-      }
+      },
     },
     {
       command: QUESTION_TYPE.CHGK,
@@ -219,9 +266,8 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
         }
 
         await ctx.reply('🚧 CHGK questions are in development');
-
-      }
-    }
+      },
+    },
   ];
 
   private getJoinLinkMessage(): string {
@@ -229,7 +275,6 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
   }
 
   onApplicationBootstrap() {
-
     if (this.isScriptMode) {
       this.logger.log('Script mode is enabled, skipping telegram service');
       return;
@@ -237,21 +282,28 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
 
     try {
       this.init();
-      this.getCachedLeaderboard().catch(err =>
-        this.logger.error('Failed to pre-populate leaderboard cache', err)
+      this.getCachedLeaderboard().catch((err) =>
+        this.logger.error('Failed to pre-populate leaderboard cache', err),
       );
-    }
-    catch (err) {
+    } catch (err) {
       this.logger.error('Failed to initialize Telegram bot', err);
     }
   }
 
-  private getChatKind(ctx: any): { type?: string; isDM: boolean; isGroup: boolean; isChannel: boolean; isThread: boolean } {
+  private getChatKind(ctx: any): {
+    type?: string;
+    isDM: boolean;
+    isGroup: boolean;
+    isChannel: boolean;
+    isThread: boolean;
+  } {
     const type = ctx.chat?.type as string | undefined;
     const isDM = type === 'private';
     const isGroup = type === 'group' || type === 'supergroup';
     const isChannel = type === 'channel';
-    const isThread = Boolean(ctx.message?.message_thread_id || ctx.message_thread_id);
+    const isThread = Boolean(
+      ctx.message?.message_thread_id || ctx.message_thread_id,
+    );
     return { type, isDM, isGroup, isChannel, isThread };
   }
 
@@ -262,14 +314,13 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
     return filled + empty;
   }
 
-
   public renderQuestion(question: string): string {
     const replacements: { [key: string]: string } = {
-      'а': 'a',
-      'е': 'e',
-      'о': 'o',
-      'с': 'c',
-      'р': 'p',
+      а: 'a',
+      е: 'e',
+      о: 'o',
+      с: 'c',
+      р: 'p',
     };
 
     let normalizedQuestion = question;
@@ -295,18 +346,25 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
   public renderClue(hint: string): string {
     const words = hint.split(/[\s-]+/).filter(Boolean);
 
-    const lengths = words.map(word => {
-      const cleaned = this.stripPunctuation(word);
-      return cleaned.length > 0 ? cleaned.length : null;
-    }).filter(length => length !== null) as number[];
+    const lengths = words
+      .map((word) => {
+        const cleaned = this.stripPunctuationForClue(word);
+        return cleaned.length > 0 ? cleaned.length : null;
+      })
+      .filter((length) => length !== null);
 
     const lengthsString = lengths.join(' ');
 
     return `💡 <b>${hint}</b> <code>[${lengthsString}]</code>\n`;
   }
 
-  public renderQuestionMessage(question: string, hint: string, difficulty: number, category?: string, debug?: string): string {
-
+  public renderQuestionMessage(
+    question: string,
+    hint: string,
+    difficulty: number,
+    category?: string,
+    debug?: string,
+  ): string {
     let message = this.renderQuestion(question);
 
     message += this.renderClue(hint);
@@ -327,7 +385,8 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
       message += `category: ${category || '-'}\n`;
     }
 
-    const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
+    const isProduction =
+      this.configService.get<string>('NODE_ENV') === 'production';
     if (!isProduction && debug) {
       message += `debug: ${debug}\n`;
     }
@@ -336,7 +395,6 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
   }
 
   private async stopBot() {
-
     if (this.isScriptMode) {
       return;
     }
@@ -349,18 +407,24 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
     }
   }
 
-  public async revealAnswer(chatId: number, telegramMessageThreadId: number | undefined, question: QuestionDocument): Promise<void> {
-    const randomReaction = WRONG_ANSWER_REACTIONS[Math.floor(Math.random() * CORRECT_ANSWER_REACTIONS.length)];
+  public async revealAnswer(
+    chatId: number,
+    telegramMessageThreadId: number | undefined,
+    question: QuestionDocument,
+  ): Promise<void> {
+    const randomReaction =
+      WRONG_ANSWER_REACTIONS[
+      Math.floor(Math.random() * CORRECT_ANSWER_REACTIONS.length)
+      ];
     const randomWrongEmoji = (randomReaction as { emoji: string }).emoji;
     await this.sendMessage(
       chatId,
       telegramMessageThreadId,
-      `${randomWrongEmoji || '❄️'}Answer: <i>${question.answer}</i>\n${this.getPlayAgainLink(question.type)}\n\n`
+      `${randomWrongEmoji || '❄️'}Answer: <i>${question.answer}</i>\n${this.getPlayAgainLink(question.type)}\n\n`,
     );
   }
 
   private async init() {
-
     if (this.bot) {
       await this.stopBot();
     }
@@ -381,7 +445,8 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
     this.setBotCommands();
     this.setBotTextActions();
 
-    this.bot.launch()
+    this.bot
+      .launch()
       .then(() => this.logger.log('Telegram bot launched'))
       .catch((err) => this.logger.error('Failed to launch Telegram bot', err));
   }
@@ -393,7 +458,10 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
     return `\n🔄 /${type}@${this.bot?.botInfo?.username}`;
   }
 
-  private wasBotMentioned(message: Message.TextMessage, botUsername: string | undefined): boolean {
+  private wasBotMentioned(
+    message: Message.TextMessage,
+    botUsername: string | undefined,
+  ): boolean {
     if (!message.text || !message.entities || !botUsername) {
       return false;
     }
@@ -402,7 +470,10 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
 
     for (const entity of message.entities) {
       if (entity.type === 'mention') {
-        const mentionedText = message.text.substring(entity.offset, entity.offset + entity.length);
+        const mentionedText = message.text.substring(
+          entity.offset,
+          entity.offset + entity.length,
+        );
         if (mentionedText.toLowerCase() === targetMention.toLowerCase()) {
           return true;
         }
@@ -426,10 +497,16 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
     }
 
     const botUsername = this.bot?.botInfo?.username;
-    const isReplyBot = (ctx.message as any).reply_to_message?.from?.is_bot;
-    const wasBotRepliedTo = Boolean(isReplyBot && (ctx.message as any).reply_to_message?.from?.username === botUsername);
-    const wasBotMentioned = botUsername ? this.wasBotMentioned(ctx.message as Message.TextMessage, botUsername) : false;
-    const messageToProcess = this.trimBotMention(text, botUsername).trim() || null;
+    const isReplyBot = ctx.message.reply_to_message?.from?.is_bot;
+    const wasBotRepliedTo = Boolean(
+      isReplyBot &&
+      ctx.message.reply_to_message?.from?.username === botUsername,
+    );
+    const wasBotMentioned = botUsername
+      ? this.wasBotMentioned(ctx.message as Message.TextMessage, botUsername)
+      : false;
+    const messageToProcess =
+      this.trimBotMention(text, botUsername).trim() || null;
 
     if (wasBotRepliedTo || wasBotMentioned) {
       return messageToProcess || null;
@@ -439,14 +516,26 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
   }
 
   private stripPunctuation(text: string): string {
-    return text.replace(/[.,!?:;"'()\[\]{}]/g, '');
+    // Preserve '.', ',', and ':' as they can be part of valid answers like '3.14', '1,500', and '16:9'
+    return text.replace(/[!?;\"'()\[\]{}]/g, '');
   }
 
-  private trimBotMention(text: string, botUsername: string | undefined): string {
+  // Dedicated punctuation stripper for clue length calculation: remove most punctuation including . , :
+  private stripPunctuationForClue(text: string): string {
+    return text.replace(/[.,!?:;\"'()\[\]{}]/g, '');
+  }
+
+  private trimBotMention(
+    text: string,
+    botUsername: string | undefined,
+  ): string {
     if (!botUsername) {
       return text;
     }
-    const escapedUsername = botUsername.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const escapedUsername = botUsername.replace(
+      /[-\/\\^$*+?.()|[\]{}]/g,
+      '\\$&',
+    );
     const mentionRegex = new RegExp(`\s*@?${escapedUsername}[\\s,:]*`, 'gi');
     let result = text.replace(mentionRegex, ' ');
     result = this.stripPunctuation(result);
@@ -455,21 +544,25 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
   }
 
   private setBotTextActions() {
-
     if (!this.bot) {
       this.logger.warn('Bot not initialized; cannot set text actions.');
       return;
     }
 
     this.bot.start(async (ctx) => {
-      await this.reply(ctx, `Welcome to Saturivia🪐!\n ${this.getJoinLinkMessage()}`);
+      await this.reply(
+        ctx,
+        `Welcome to Saturivia🪐!\n ${this.getJoinLinkMessage()}`,
+      );
     });
 
     this.bot.on('message', async (ctx, next) => {
       const telegramChatId = ctx.chat?.id;
       const topicMessage = ctx.message?.is_topic_message;
       // telegramMessageThreadId needs to be filled only for topics, to distinguish threads and main chat
-      const telegramMessageThreadId = topicMessage ? ctx.message?.message_thread_id : undefined;
+      const telegramMessageThreadId = topicMessage
+        ? ctx.message?.message_thread_id
+        : undefined;
       const replyToMessage = (ctx.message as any).reply_to_message;
 
       if (!ctx.message || (ctx.message as any).text === undefined) {
@@ -480,15 +573,26 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
       const messageText = (ctx.message as any).text as string;
       const { isDM, type, isThread } = this.getChatKind(ctx);
 
-      const isBot = ctx.from?.is_bot && ctx.from.username !== 'GroupAnonymousBot';
+      const isBot =
+        ctx.from?.is_bot && ctx.from.username !== 'GroupAnonymousBot';
 
-      if (!telegramChatId || !ctx.from || !messageText || messageText.startsWith('/') || isDM || isBot) {
+      if (
+        !telegramChatId ||
+        !ctx.from ||
+        !messageText ||
+        messageText.startsWith('/') ||
+        isDM ||
+        isBot
+      ) {
         await next();
         return;
       }
 
       try {
-        const game = await this.gameService.getGame(telegramChatId, telegramMessageThreadId || undefined);
+        const game = await this.gameService.getGame(
+          telegramChatId,
+          telegramMessageThreadId || undefined,
+        );
 
         if (!game) {
           return;
@@ -504,7 +608,11 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
         );
 
         if (isCorrectMessageText && !text) {
-          this.bot?.telegram.setMessageReaction(telegramChatId, ctx.message.message_id, INVALID_ANSWER_REACTIONS);
+          this.bot?.telegram.setMessageReaction(
+            telegramChatId,
+            ctx.message.message_id,
+            INVALID_ANSWER_REACTIONS,
+          );
           return;
         }
 
@@ -524,25 +632,46 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
         );
 
         // since it is 'official' answer, can record the player right away
-        const player = await this.playerService.findOrCreatePlayer(ctx.from.id, ctx.from.username);
+        const player = await this.playerService.findOrCreatePlayer(
+          ctx.from.id,
+          ctx.from.username,
+        );
 
         if (isCorrect) {
+          const wrongAnswers =
+            await this.questionService.getIncorrectAnswersForQuestion(
+              telegramChatId,
+              telegramMessageThreadId,
+              String((game.question as QuestionDocument)._id),
+              String(player._id),
+            );
 
-          const wrongAnswers = await this.questionService.getIncorrectAnswersForQuestion(
-            telegramChatId,
-            telegramMessageThreadId,
-            String((game.question as QuestionDocument)._id),
-            String(player._id),
+          const score = this.gameService.getScoreFromStage(
+            game.question.difficulty,
+            game.stage,
+            wrongAnswers,
           );
-
-          const score = this.gameService.getScoreFromStage(game.question.difficulty, game.stage, wrongAnswers);
 
           const leaderboardBefore = await this.getCachedLeaderboard();
 
-          const randomReaction = CORRECT_ANSWER_REACTIONS[Math.floor(Math.random() * CORRECT_ANSWER_REACTIONS.length)];
-          this.bot?.telegram.setMessageReaction(telegramChatId, ctx.message.message_id, [randomReaction]);
-          const mentionUser = this.mentionUserByTelegramId(ctx.from.id, ctx.from.username, ctx.from.first_name || ctx.from.last_name);
-          await this.reply(ctx, `${(randomReaction as { emoji: string }).emoji} <i>${originalAnswer}</i>\n\n---\n${mentionUser}: +${score} points\n${this.getPlayAgainLink(game.question.type)}`);
+          const randomReaction =
+            CORRECT_ANSWER_REACTIONS[
+            Math.floor(Math.random() * CORRECT_ANSWER_REACTIONS.length)
+            ];
+          this.bot?.telegram.setMessageReaction(
+            telegramChatId,
+            ctx.message.message_id,
+            [randomReaction],
+          );
+          const mentionUser = this.mentionUserByTelegramId(
+            ctx.from.id,
+            ctx.from.username,
+            ctx.from.first_name || ctx.from.last_name,
+          );
+          await this.reply(
+            ctx,
+            `${(randomReaction as { emoji: string }).emoji} <i>${originalAnswer}</i>\n\n---\n${mentionUser}: +${score} points\n${this.getPlayAgainLink(game.question.type)}`,
+          );
 
           await this.gameService.endCurrentGame(
             telegramChatId,
@@ -551,7 +680,7 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
             score,
             String(player._id),
             String(game.triggeredPlayerId),
-            game.stage
+            game.stage,
           );
 
           await this.checkAndSendLeaderboardUpdate(
@@ -561,21 +690,27 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
             String(player._id),
             score,
             player.username,
-            player.telegramId
+            player.telegramId,
           );
-
         } else {
           this.questionService.saveIncorrectAnswer(
             telegramChatId,
             telegramMessageThreadId,
             String((game.question as QuestionDocument)._id),
             String(player._id),
-            text
+            text,
           );
 
           //if (originalAnswer.length === text.length) {}
-          const randomReaction = WRONG_ANSWER_REACTIONS[Math.floor(Math.random() * WRONG_ANSWER_REACTIONS.length)];
-          this.bot?.telegram.setMessageReaction(telegramChatId, ctx.message.message_id, [randomReaction]);
+          const randomReaction =
+            WRONG_ANSWER_REACTIONS[
+            Math.floor(Math.random() * WRONG_ANSWER_REACTIONS.length)
+            ];
+          this.bot?.telegram.setMessageReaction(
+            telegramChatId,
+            ctx.message.message_id,
+            [randomReaction],
+          );
         }
       } catch (err) {
         this.logger.error('Error processing text message', err);
@@ -583,17 +718,22 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
     });
   }
 
-  public mentionUserByTelegramId(id: string | number, username: string | undefined, name: string | undefined) {
+  public mentionUserByTelegramId(
+    id: string | number,
+    username: string | undefined,
+    name: string | undefined,
+  ) {
     if (!id) {
       return username || name || 'Player';
     }
 
-    const mention = id.toString().startsWith('@') ? id : `<a href="tg://user?id=${id}">${username || name || id}</a>`;
+    const mention = id.toString().startsWith('@')
+      ? id
+      : `<a href="tg://user?id=${id}">${username || name || id}</a>`;
     return `${mention}`;
   }
 
   private async setBotCommands() {
-
     if (!this.bot) {
       this.logger.warn('Bot not initialized; cannot set bot commands.');
       return;
@@ -601,7 +741,7 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
 
     try {
       await this.bot.telegram.setMyCommands(this.botCommands);
-      this.botCommands.forEach(it => {
+      this.botCommands.forEach((it) => {
         this.bot?.command(it.command, (ctx) => {
           it.action(ctx);
         });
@@ -618,7 +758,7 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
         await this.stopBot();
         this.logger.log('Telegram bot stopped');
       } catch (err) {
-        const msg = err && (err as any).message ? String((err as any).message) : '';
+        const msg = err && err.message ? String(err.message) : '';
         if (msg.includes('Bot is not running')) {
           this.logger.log('Telegram bot was not running during shutdown');
         } else {
@@ -629,9 +769,9 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
   }
 
   private getDefaultExtra() {
-    return ({
+    return {
       parse_mode: 'HTML' as import('telegraf/types').ParseMode,
-    });
+    };
   }
 
   private async reply(ctx: Context, text: string): Promise<void> {
@@ -639,9 +779,12 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
     await ctx.reply(text, extra);
   }
 
-  async sendMessage(chatId: number, telegramMessageThreadId: number | undefined, text: string): Promise<void> {
+  async sendMessage(
+    chatId: number,
+    telegramMessageThreadId: number | undefined,
+    text: string,
+  ): Promise<void> {
     if (this.bot) {
-
       const extra = this.getDefaultExtra();
 
       if (telegramMessageThreadId) {
@@ -649,13 +792,19 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
       }
 
       await this.bot.telegram.sendMessage(chatId, text, extra);
-
     } else {
       this.logger.warn('Bot not initialized. Cannot send message.');
     }
   }
 
-  private async getCachedLeaderboard(): Promise<Array<{ playerId: string; totalScore: number; username?: string; telegramId?: number }>> {
+  private async getCachedLeaderboard(): Promise<
+    Array<{
+      playerId: string;
+      totalScore: number;
+      username?: string;
+      telegramId?: number;
+    }>
+  > {
     if (this.cachedLeaderboard.length === 0) {
       this.cachedLeaderboard = await this.playerService.getTopPlayers(10);
     }
@@ -663,8 +812,15 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
     return [...this.cachedLeaderboard];
   }
 
-  private async updateCachedLeaderboard(winnerPlayerId: string, scoreToAdd: number, winnerUsername?: string, winnerTelegramId?: number): Promise<void> {
-    const winnerIndex = this.cachedLeaderboard.findIndex(p => String(p.playerId) === winnerPlayerId);
+  private async updateCachedLeaderboard(
+    winnerPlayerId: string,
+    scoreToAdd: number,
+    winnerUsername?: string,
+    winnerTelegramId?: number,
+  ): Promise<void> {
+    const winnerIndex = this.cachedLeaderboard.findIndex(
+      (p) => String(p.playerId) === winnerPlayerId,
+    );
 
     if (winnerIndex !== -1) {
       this.cachedLeaderboard[winnerIndex].totalScore += scoreToAdd;
@@ -673,21 +829,23 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
       }
     } else {
       const freshLeaderboard = await this.playerService.getTopPlayers(15);
-      const winnerInFreshData = freshLeaderboard.find(p => String(p.playerId) === winnerPlayerId);
+      const winnerInFreshData = freshLeaderboard.find(
+        (p) => String(p.playerId) === winnerPlayerId,
+      );
 
       if (winnerInFreshData) {
         this.cachedLeaderboard.push({
           playerId: winnerPlayerId,
           totalScore: winnerInFreshData.totalScore,
           username: winnerInFreshData.username,
-          telegramId: winnerInFreshData.telegramId
+          telegramId: winnerInFreshData.telegramId,
         });
       } else {
         this.cachedLeaderboard.push({
           playerId: winnerPlayerId,
           totalScore: scoreToAdd,
           username: winnerUsername,
-          telegramId: winnerTelegramId
+          telegramId: winnerTelegramId,
         });
       }
     }
@@ -698,7 +856,15 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
   }
 
   private removeDuplicatesFromCache(): void {
-    const playerMap = new Map<string, { playerId: string; totalScore: number; username?: string; telegramId?: number }>();
+    const playerMap = new Map<
+      string,
+      {
+        playerId: string;
+        totalScore: number;
+        username?: string;
+        telegramId?: number;
+      }
+    >();
 
     for (const player of this.cachedLeaderboard) {
       const playerIdStr = String(player.playerId);
@@ -718,23 +884,42 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
   private async checkAndSendLeaderboardUpdate(
     chatId: number,
     telegramMessageThreadId: number | undefined,
-    leaderboardBefore: Array<{ playerId: string; totalScore: number; username?: string; telegramId?: number }>,
+    leaderboardBefore: Array<{
+      playerId: string;
+      totalScore: number;
+      username?: string;
+      telegramId?: number;
+    }>,
     winnerPlayerId: string,
     scoreToAdd: number,
     winnerUsername?: string,
-    winnerTelegramId?: number
+    winnerTelegramId?: number,
   ): Promise<void> {
     try {
-      await this.updateCachedLeaderboard(winnerPlayerId, scoreToAdd, winnerUsername, winnerTelegramId);
+      await this.updateCachedLeaderboard(
+        winnerPlayerId,
+        scoreToAdd,
+        winnerUsername,
+        winnerTelegramId,
+      );
 
       const leaderboardAfter = await this.getCachedLeaderboard();
 
-      const positionsChanged = this.hasLeaderboardChanged(leaderboardBefore, leaderboardAfter, winnerPlayerId);
+      const positionsChanged = this.hasLeaderboardChanged(
+        leaderboardBefore,
+        leaderboardAfter,
+        winnerPlayerId,
+      );
 
       if (positionsChanged) {
-        const leaderboardMessage = this.formatLeaderboardMessage(leaderboardAfter);
+        const leaderboardMessage =
+          this.formatLeaderboardMessage(leaderboardAfter);
 
-        await this.sendMessage(chatId, telegramMessageThreadId, `\n🏆 <b>Leaderboard Updated!</b>\n${leaderboardMessage}`);
+        await this.sendMessage(
+          chatId,
+          telegramMessageThreadId,
+          `\n🏆 <b>Leaderboard Updated!</b>\n${leaderboardMessage}`,
+        );
       }
     } catch (error) {
       this.logger.error('Error checking leaderboard changes:', error);
@@ -742,18 +927,36 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
   }
 
   private hasLeaderboardChanged(
-    before: Array<{ playerId: string; totalScore: number; username?: string; telegramId?: number }>,
-    after: Array<{ playerId: string; totalScore: number; username?: string; telegramId?: number }>,
-    winnerPlayerId: string
+    before: Array<{
+      playerId: string;
+      totalScore: number;
+      username?: string;
+      telegramId?: number;
+    }>,
+    after: Array<{
+      playerId: string;
+      totalScore: number;
+      username?: string;
+      telegramId?: number;
+    }>,
+    winnerPlayerId: string,
   ): boolean {
-    const winnerBeforeIndex = before.findIndex(p => String(p.playerId) === winnerPlayerId);
-    const winnerAfterIndex = after.findIndex(p => String(p.playerId) === winnerPlayerId);
+    const winnerBeforeIndex = before.findIndex(
+      (p) => String(p.playerId) === winnerPlayerId,
+    );
+    const winnerAfterIndex = after.findIndex(
+      (p) => String(p.playerId) === winnerPlayerId,
+    );
 
     if (winnerBeforeIndex === -1 && winnerAfterIndex !== -1) {
       return true;
     }
 
-    if (winnerBeforeIndex !== -1 && winnerAfterIndex !== -1 && winnerAfterIndex < winnerBeforeIndex) {
+    if (
+      winnerBeforeIndex !== -1 &&
+      winnerAfterIndex !== -1 &&
+      winnerAfterIndex < winnerBeforeIndex
+    ) {
       return true;
     }
 
@@ -770,7 +973,14 @@ export class TelegramService implements OnApplicationBootstrap, OnModuleDestroy 
     return false;
   }
 
-  private formatLeaderboardMessage(leaderboard: Array<{ playerId: string; totalScore: number; username?: string; telegramId?: number }>): string {
+  private formatLeaderboardMessage(
+    leaderboard: Array<{
+      playerId: string;
+      totalScore: number;
+      username?: string;
+      telegramId?: number;
+    }>,
+  ): string {
     if (!leaderboard || leaderboard.length === 0) {
       return '🫙 No scores yet. Play some games!';
     }

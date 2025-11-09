@@ -7,14 +7,14 @@ export type IncorrectAnswerDocument = IncorrectAnswer & Document;
 
 @Schema({
   timestamps: { createdAt: true, updatedAt: false },
-  collection: 'incorrectAnswers'
+  collection: 'incorrectAnswers',
 })
 export class IncorrectAnswer {
   @Prop({
     type: MongooseSchema.Types.ObjectId,
     ref: 'Question',
     required: true,
-    index: true
+    index: true,
   })
   question: Question;
 
@@ -22,7 +22,7 @@ export class IncorrectAnswer {
     type: MongooseSchema.Types.ObjectId,
     ref: 'Player',
     required: true,
-    index: true
+    index: true,
   })
   playerId?: Player;
 
@@ -39,12 +39,19 @@ export class IncorrectAnswer {
   isDeleted: boolean;
 }
 
-export const IncorrectAnswerSchema = SchemaFactory.createForClass(IncorrectAnswer);
+export const IncorrectAnswerSchema =
+  SchemaFactory.createForClass(IncorrectAnswer);
 
-IncorrectAnswerSchema.index({ question: 1, playerId: 1, telegramChatId: 1, telegramMessageThreadId: 1 }, {
-  unique: false,
-  sparse: true,
-  name: 'question_playerId_chat_unique',
-});
+IncorrectAnswerSchema.index(
+  { question: 1, playerId: 1, telegramChatId: 1, telegramMessageThreadId: 1 },
+  {
+    unique: false,
+    sparse: true,
+    name: 'question_playerId_chat_unique',
+  },
+);
 
-IncorrectAnswerSchema.index({ question: 1, createdAt: 1 }, { name: 'question_createdAt' });
+IncorrectAnswerSchema.index(
+  { question: 1, createdAt: 1 },
+  { name: 'question_createdAt' },
+);

@@ -6,10 +6,9 @@ export type QuestionDocument = Question & Document;
 
 @Schema({
   timestamps: true,
-  collection: 'questions'
+  collection: 'questions',
 })
 export class Question {
-
   @Prop({ required: true })
   question: string;
 
@@ -41,7 +40,7 @@ export class Question {
   hint: string;
 
   // for images or attachments
-  @Prop({ required: false})
+  @Prop({ required: false })
   url: string;
 
   // for fetching new random question

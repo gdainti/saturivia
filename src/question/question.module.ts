@@ -2,8 +2,14 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { QuestionService } from './question.service';
 import { Question, QuestionSchema } from 'src/question/question.schema';
-import { QuestionHistory, QuestionHistorySchema } from './question-history.schema';
-import { IncorrectAnswer, IncorrectAnswerSchema } from 'src/question/incorrect-answer.schema';
+import {
+  QuestionHistory,
+  QuestionHistorySchema,
+} from './question-history.schema';
+import {
+  IncorrectAnswer,
+  IncorrectAnswerSchema,
+} from 'src/question/incorrect-answer.schema';
 
 @Module({
   imports: [
@@ -14,6 +20,6 @@ import { IncorrectAnswer, IncorrectAnswerSchema } from 'src/question/incorrect-a
     ]),
   ],
   providers: [QuestionService],
-  exports: [QuestionService]
+  exports: [QuestionService],
 })
-export class QuestionModule { }
+export class QuestionModule {}

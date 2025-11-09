@@ -8,14 +8,14 @@ export type QuestionHistoryDocument = QuestionHistory & Document;
 
 @Schema({
   timestamps: { createdAt: true, updatedAt: false },
-  collection: 'questionHistory'
+  collection: 'questionHistory',
 })
 export class QuestionHistory {
   @Prop({
     type: MongooseSchema.Types.ObjectId,
     ref: 'Question',
     required: true,
-    index: true
+    index: true,
   })
   question: Question;
 
@@ -23,7 +23,7 @@ export class QuestionHistory {
     type: MongooseSchema.Types.ObjectId,
     ref: 'Player',
     required: false,
-    index: true
+    index: true,
   })
   // if player answered the question
   playerId?: Player;
@@ -32,7 +32,7 @@ export class QuestionHistory {
     type: MongooseSchema.Types.ObjectId,
     ref: 'Player',
     required: false,
-    index: true
+    index: true,
   })
   triggeredPlayerId?: Player;
 
@@ -49,7 +49,7 @@ export class QuestionHistory {
     type: String,
     required: false,
     enum: Object.values(GAME_STAGE),
-    default: null
+    default: null,
   })
   stage: GAME_STAGE;
 
@@ -57,18 +57,28 @@ export class QuestionHistory {
   isDeleted: boolean;
 }
 
-export const QuestionHistorySchema = SchemaFactory.createForClass(QuestionHistory);
+export const QuestionHistorySchema =
+  SchemaFactory.createForClass(QuestionHistory);
 
-QuestionHistorySchema.index({ question: 1, playerId: 1 }, {
-  unique: false,
-  sparse: true,
-  name: 'question_playerId_non_unique',
-});
+QuestionHistorySchema.index(
+  { question: 1, playerId: 1 },
+  {
+    unique: false,
+    sparse: true,
+    name: 'question_playerId_non_unique',
+  },
+);
 
-QuestionHistorySchema.index({ question: 1, triggeredPlayerId: 1 }, {
-  unique: false,
-  sparse: true,
-  name: 'question_triggeredPlayerId_non_unique',
-});
+QuestionHistorySchema.index(
+  { question: 1, triggeredPlayerId: 1 },
+  {
+    unique: false,
+    sparse: true,
+    name: 'question_triggeredPlayerId_non_unique',
+  },
+);
 
-QuestionHistorySchema.index({ question: 1, createdAt: 1 }, { name: 'question_createdAt' });
+QuestionHistorySchema.index(
+  { question: 1, createdAt: 1 },
+  { name: 'question_createdAt' },
+);

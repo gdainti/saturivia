@@ -9,6 +9,77 @@ describe('trimBotMention', () => {
     service = new TelegramService({}, {}, {}, {});
   });
 
+  describe('getMessageForProcessing()', () => {
+    // Minimal fake of the service with only getMessageForProcessing + dependencies used inside
+    const service = new TelegramService({} as any, {} as any, {} as any, {} as any);
+    // Inject a fake bot username for mention handling
+    (service as any).bot = { botInfo: { username: 'TestBot' } } as any;
+
+    const baseCtx = (text: string, extra: any = {}) => ({
+      message: {
+        text,
+        entities: extra.entities || [],
+        reply_to_message: extra.reply_to_message,
+        message_thread_id: extra.message_thread_id,
+      },
+      chat: { id: 1, type: 'supergroup' },
+      from: { id: 42, is_bot: false, username: 'player' },
+    });
+
+    it('extracts answer after mention for numeric Cyrillic unit (1500 м)', () => {
+      const ctx = baseCtx('@TestBot 1500 м', {
+        entities: [
+          { type: 'mention', offset: 0, length: 8 }, // '@TestBot'
+        ],
+      });
+
+      const result = (service as any).getMessageForProcessing(ctx, ctx.message.text);
+      expect(result).toBe('1500 м');
+    });
+
+    it('returns null when message not directed at bot (no mention, no =)', () => {
+      const ctx = baseCtx('1500 м');
+      const result = (service as any).getMessageForProcessing(ctx, ctx.message.text);
+      expect(result).toBeNull();
+    });
+
+    it('accepts = syntax for numeric Cyrillic unit', () => {
+      const ctx = baseCtx('= 1500 м');
+      const result = (service as any).getMessageForProcessing(ctx, ctx.message.text);
+      expect(result).toBe('1500 м');
+    });
+
+    it('accepts trailing = syntax variant', () => {
+      const ctx = baseCtx('1500 м =');
+      const result = (service as any).getMessageForProcessing(ctx, ctx.message.text);
+      expect(result).toBe('1500 м');
+    });
+
+    it('ignores punctuation around mention and unit', () => {
+      const ctx = baseCtx('@TestBot: 1500 м!', {
+        entities: [{ type: 'mention', offset: 0, length: 8 }],
+      });
+      const result = (service as any).getMessageForProcessing(ctx, ctx.message.text);
+      expect(result).toBe('1500 м');
+    });
+
+    it('preserves dot for decimals', () => {
+      const ctx = baseCtx('@TestBot 3.14', {
+        entities: [{ type: 'mention', offset: 0, length: 8 }],
+      });
+      const result = (service as any).getMessageForProcessing(ctx, ctx.message.text);
+      expect(result).toBe('3.14');
+    });
+
+    it('preserves comma for thousands separator and unit', () => {
+      const ctx = baseCtx('@TestBot 1,500 м', {
+        entities: [{ type: 'mention', offset: 0, length: 8 }],
+      });
+      const result = (service as any).getMessageForProcessing(ctx, ctx.message.text);
+      expect(result).toBe('1,500 м');
+    });
+  });
+
   it('removes mention at the beginning', () => {
     const text = '@TestBot hello world';
     expect(service['trimBotMention'](text, botUsername)).toBe('hello world');
@@ -29,9 +100,10 @@ describe('trimBotMention', () => {
     expect(service['trimBotMention'](text, botUsername)).toBe('hello world');
   });
 
-  it('removes mention with extra spaces and punctuation', () => {
+  it('removes mention with extra spaces and preserves commas/dots', () => {
     const text = 'hello, @TestBot: world!';
-    expect(service['trimBotMention'](text, botUsername)).toBe('hello world');
+    // Now we preserve ',' and '.' so expect the comma to remain
+    expect(service['trimBotMention'](text, botUsername)).toBe('hello, world');
   });
 
   it('returns original text if no mention', () => {
@@ -63,83 +135,94 @@ describe('hasLeaderboardChanged', () => {
     service = new TelegramService({}, {}, {}, {});
   });
 
-  const createMockLeaderboard = (players: Array<{playerId: string, totalScore: number, username?: string}>) =>
-    players.map(p => ({ ...p, telegramId: 123 }));
+  const createMockLeaderboard = (
+    players: Array<{ playerId: string; totalScore: number; username?: string }>,
+  ) => players.map((p) => ({ ...p, telegramId: 123 }));
 
   it('should detect when winner enters leaderboard for first time', () => {
     const before = createMockLeaderboard([
       { playerId: 'player1', totalScore: 100, username: 'user1' },
-      { playerId: 'player2', totalScore: 90, username: 'user2' }
+      { playerId: 'player2', totalScore: 90, username: 'user2' },
     ]);
 
     const after = createMockLeaderboard([
       { playerId: 'player1', totalScore: 100, username: 'user1' },
       { playerId: 'player2', totalScore: 90, username: 'user2' },
-      { playerId: 'winner', totalScore: 80, username: 'winner' }
+      { playerId: 'winner', totalScore: 80, username: 'winner' },
     ]);
 
-    expect(service['hasLeaderboardChanged'](before, after, 'winner')).toBe(true);
+    expect(service['hasLeaderboardChanged'](before, after, 'winner')).toBe(
+      true,
+    );
   });
 
   it('should detect when winner improves position', () => {
     const before = createMockLeaderboard([
       { playerId: 'player1', totalScore: 100, username: 'user1' },
       { playerId: 'player2', totalScore: 90, username: 'user2' },
-      { playerId: 'winner', totalScore: 80, username: 'winner' }
+      { playerId: 'winner', totalScore: 80, username: 'winner' },
     ]);
 
     const after = createMockLeaderboard([
       { playerId: 'player1', totalScore: 100, username: 'user1' },
       { playerId: 'winner', totalScore: 95, username: 'winner' },
-      { playerId: 'player2', totalScore: 90, username: 'user2' }
+      { playerId: 'player2', totalScore: 90, username: 'user2' },
     ]);
 
-    expect(service['hasLeaderboardChanged'](before, after, 'winner')).toBe(true);
+    expect(service['hasLeaderboardChanged'](before, after, 'winner')).toBe(
+      true,
+    );
   });
 
   it('should detect when any position changes', () => {
     const before = createMockLeaderboard([
       { playerId: 'player1', totalScore: 100, username: 'user1' },
       { playerId: 'player2', totalScore: 90, username: 'user2' },
-      { playerId: 'player3', totalScore: 80, username: 'user3' }
+      { playerId: 'player3', totalScore: 80, username: 'user3' },
     ]);
 
     const after = createMockLeaderboard([
       { playerId: 'player2', totalScore: 95, username: 'user2' },
       { playerId: 'player1', totalScore: 100, username: 'user1' },
-      { playerId: 'player3', totalScore: 80, username: 'user3' }
+      { playerId: 'player3', totalScore: 80, username: 'user3' },
     ]);
 
-    expect(service['hasLeaderboardChanged'](before, after, 'player2')).toBe(true);
+    expect(service['hasLeaderboardChanged'](before, after, 'player2')).toBe(
+      true,
+    );
   });
 
   it('should return false when no positions change', () => {
     const before = createMockLeaderboard([
       { playerId: 'player1', totalScore: 100, username: 'user1' },
       { playerId: 'player2', totalScore: 90, username: 'user2' },
-      { playerId: 'winner', totalScore: 80, username: 'winner' }
+      { playerId: 'winner', totalScore: 80, username: 'winner' },
     ]);
 
     const after = createMockLeaderboard([
       { playerId: 'player1', totalScore: 100, username: 'user1' },
       { playerId: 'player2', totalScore: 90, username: 'user2' },
-      { playerId: 'winner', totalScore: 85, username: 'winner' }
+      { playerId: 'winner', totalScore: 85, username: 'winner' },
     ]);
 
-    expect(service['hasLeaderboardChanged'](before, after, 'winner')).toBe(false);
+    expect(service['hasLeaderboardChanged'](before, after, 'winner')).toBe(
+      false,
+    );
   });
 
   it('should detect when leaderboard length changes', () => {
     const before = createMockLeaderboard([
       { playerId: 'player1', totalScore: 100, username: 'user1' },
-      { playerId: 'player2', totalScore: 90, username: 'user2' }
+      { playerId: 'player2', totalScore: 90, username: 'user2' },
     ]);
 
     const after = createMockLeaderboard([
-      { playerId: 'player1', totalScore: 100, username: 'user1' }
+      { playerId: 'player1', totalScore: 100, username: 'user1' },
     ]);
 
-    expect(service['hasLeaderboardChanged'](before, after, 'player1')).toBe(true);
+    expect(service['hasLeaderboardChanged'](before, after, 'player1')).toBe(
+      true,
+    );
   });
 });
 
@@ -156,7 +239,7 @@ describe('formatLeaderboardMessage', () => {
       { playerId: '1', totalScore: 100, username: 'first', telegramId: 123 },
       { playerId: '2', totalScore: 90, username: 'second', telegramId: 124 },
       { playerId: '3', totalScore: 80, username: 'third', telegramId: 125 },
-      { playerId: '4', totalScore: 70, username: 'fourth', telegramId: 126 }
+      { playerId: '4', totalScore: 70, username: 'fourth', telegramId: 126 },
     ];
 
     const result = service['formatLeaderboardMessage'](leaderboard);
@@ -173,9 +256,7 @@ describe('formatLeaderboardMessage', () => {
   });
 
   it('should use telegramId when username is missing', () => {
-    const leaderboard = [
-      { playerId: '1', totalScore: 100, telegramId: 123 }
-    ];
+    const leaderboard = [{ playerId: '1', totalScore: 100, telegramId: 123 }];
 
     const result = service['formatLeaderboardMessage'](leaderboard);
     expect(result).toContain('1. 123: <b>100.00</b>');
@@ -188,7 +269,7 @@ describe('leaderboard caching', () => {
 
   beforeEach(() => {
     mockPlayerService = {
-      getTopPlayers: jest.fn()
+      getTopPlayers: jest.fn(),
     };
 
     // @ts-ignore
@@ -197,7 +278,7 @@ describe('leaderboard caching', () => {
 
   it('should fetch from database only when cache is empty', async () => {
     const mockLeaderboard = [
-      { playerId: '1', totalScore: 100, username: 'test', telegramId: 123 }
+      { playerId: '1', totalScore: 100, username: 'test', telegramId: 123 },
     ];
 
     mockPlayerService.getTopPlayers.mockResolvedValue(mockLeaderboard);
@@ -216,7 +297,7 @@ describe('leaderboard caching', () => {
   it('should update cached score correctly', async () => {
     const mockLeaderboard = [
       { playerId: '1', totalScore: 100, username: 'player1', telegramId: 123 },
-      { playerId: '2', totalScore: 90, username: 'player2', telegramId: 124 }
+      { playerId: '2', totalScore: 90, username: 'player2', telegramId: 124 },
     ];
 
     mockPlayerService.getTopPlayers.mockResolvedValue(mockLeaderboard);
@@ -231,8 +312,18 @@ describe('leaderboard caching', () => {
     const result = await service['getCachedLeaderboard']();
 
     // player2 should now be first with 110 points
-    expect(result[0]).toEqual({ playerId: '2', totalScore: 110, username: 'player2', telegramId: 124 });
-    expect(result[1]).toEqual({ playerId: '1', totalScore: 100, username: 'player1', telegramId: 123 });
+    expect(result[0]).toEqual({
+      playerId: '2',
+      totalScore: 110,
+      username: 'player2',
+      telegramId: 124,
+    });
+    expect(result[1]).toEqual({
+      playerId: '1',
+      totalScore: 100,
+      username: 'player1',
+      telegramId: 123,
+    });
 
     // Should not have made additional database calls
     expect(mockPlayerService.getTopPlayers).toHaveBeenCalledTimes(1);
@@ -240,7 +331,7 @@ describe('leaderboard caching', () => {
 
   it('should add new player to cache', async () => {
     const mockLeaderboard = [
-      { playerId: '1', totalScore: 100, username: 'player1', telegramId: 123 }
+      { playerId: '1', totalScore: 100, username: 'player1', telegramId: 123 },
     ];
 
     mockPlayerService.getTopPlayers.mockResolvedValue(mockLeaderboard);
@@ -255,8 +346,18 @@ describe('leaderboard caching', () => {
     const result = await service['getCachedLeaderboard']();
 
     // New player should be first
-    expect(result[0]).toEqual({ playerId: '3', totalScore: 110, username: 'player3', telegramId: 125 });
-    expect(result[1]).toEqual({ playerId: '1', totalScore: 100, username: 'player1', telegramId: 123 });
+    expect(result[0]).toEqual({
+      playerId: '3',
+      totalScore: 110,
+      username: 'player3',
+      telegramId: 125,
+    });
+    expect(result[1]).toEqual({
+      playerId: '1',
+      totalScore: 100,
+      username: 'player1',
+      telegramId: 123,
+    });
   });
 
   it('should maintain top 10 limit', async () => {
@@ -265,7 +366,7 @@ describe('leaderboard caching', () => {
       playerId: `${i + 1}`,
       totalScore: 100 - i,
       username: `player${i + 1}`,
-      telegramId: 123 + i
+      telegramId: 123 + i,
     }));
 
     mockPlayerService.getTopPlayers.mockResolvedValue(mockLeaderboard);
@@ -282,16 +383,21 @@ describe('leaderboard caching', () => {
     // Should still have only 10 players, player10 should be kicked out
     expect(result).toHaveLength(10);
     // New player with score 95 should be somewhere in the leaderboard
-    const newPlayer = result.find(p => p.playerId === '11');
-    expect(newPlayer).toEqual({ playerId: '11', totalScore: 95, username: 'player11', telegramId: 134 });
+    const newPlayer = result.find((p) => p.playerId === '11');
+    expect(newPlayer).toEqual({
+      playerId: '11',
+      totalScore: 95,
+      username: 'player11',
+      telegramId: 134,
+    });
     // Player10 (lowest score) should no longer be in the leaderboard
-    const player10 = result.find(p => p.playerId === '10');
+    const player10 = result.find((p) => p.playerId === '10');
     expect(player10).toBeUndefined();
   });
 
   it('should clear cache correctly', async () => {
     const mockLeaderboard = [
-      { playerId: '1', totalScore: 100, username: 'test', telegramId: 123 }
+      { playerId: '1', totalScore: 100, username: 'test', telegramId: 123 },
     ];
 
     mockPlayerService.getTopPlayers.mockResolvedValue(mockLeaderboard);
