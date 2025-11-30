@@ -52,5 +52,5 @@ jobs:
           docker push $IMAGE_ID:$VERSION
 
     - name: Invoke deployment hook
-        run: curl -X POST "${{ secrets.WEBHOOK_URL }}?token=${{ secrets.WEBHOOK_SECRET }}"
+      run: curl -X POST "${{ secrets.WEBHOOK_URL }}?token=${{ secrets.WEBHOOK_SECRET }}"
 
