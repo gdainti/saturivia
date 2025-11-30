@@ -51,9 +51,6 @@ jobs:
           docker tag $IMAGE_NAME $IMAGE_ID:$VERSION
           docker push $IMAGE_ID:$VERSION
 
-    - name: invoke deployment hook
-      uses: distributhor/workflow-webhook@v3
-      with:
-        webhook_url: ${{ secrets.WEBHOOK_URL }}
-        webhook_secret: ${{ secrets.WEBHOOK_SECRET }}
+    - name: Invoke deployment hook
+        run: curl -X POST "${{ secrets.WEBHOOK_URL }}?token=${{ secrets.WEBHOOK_SECRET }}"
 
