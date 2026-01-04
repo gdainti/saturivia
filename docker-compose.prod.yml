@@ -2,7 +2,7 @@ services:
   saturivia-nestjs:
     image: ${IMAGE}:${TAG}
     container_name: saturivia-nestjs
-    restart: always
+    restart: unless-stopped
     environment:
       MONGO_USERNAME: ${MONGO_USERNAME}
       MONGO_PASSWORD: ${MONGO_PASSWORD}
