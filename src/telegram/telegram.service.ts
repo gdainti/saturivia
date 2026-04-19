@@ -224,33 +224,7 @@ export class TelegramService
         );
         const triggeredPlayerId = String(player._id);
 
-        game = await this.gameService.startNewGame(
-          chatId,
-          telegramMessageThreadId,
-          QUESTION_TYPE.TRIVIA,
-          triggeredPlayerId,
-        );
-        if (!game || !game.question?.question || !game.question?.answer) {
-          await this.reply(ctx, '❌ Error: could not start a new game.');
-          return;
-        }
-
-        const question = game.question.question;
-        const answer = game.question.answer;
-
-        await this.reply(
-          ctx,
-          this.renderQuestionMessage(
-            question,
-            this.questionService.generateClue(
-              game.question as QuestionDocument,
-              game.stage,
-            ),
-            game.question.difficulty,
-            game.question.category,
-            game.question.answer,
-          ),
-        );
+        this.startNewGame(ctx, chatId, telegramMessageThreadId, triggeredPlayerId);
       },
     },
     {
@@ -356,6 +330,36 @@ export class TelegramService
     const lengthsString = lengths.join(' ');
 
     return `💡 <b>${hint}</b> <code>[${lengthsString}]</code>\n`;
+  }
+
+  public async startNewGame(ctx: any, chatId: number, telegramMessageThreadId: number | undefined, triggeredPlayerId: string) {
+    const game = await this.gameService.startNewGame(
+          chatId,
+          telegramMessageThreadId,
+          QUESTION_TYPE.TRIVIA,
+          triggeredPlayerId,
+        );
+        if (!game || !game.question?.question || !game.question?.answer) {
+          await this.reply(ctx, '❌ Error: could not start a new game.');
+          return;
+        }
+
+        const question = game.question.question;
+        const answer = game.question.answer;
+
+        await this.reply(
+          ctx,
+          this.renderQuestionMessage(
+            question,
+            this.questionService.generateClue(
+              game.question as QuestionDocument,
+              game.stage,
+            ),
+            game.question.difficulty,
+            game.question.category,
+            game.question.answer,
+          ),
+        );
   }
 
   public renderQuestionMessage(
@@ -694,10 +698,10 @@ export class TelegramService
             player.telegramId,
           );
 
-          await this.gameService.startNewGame(
+          await this.startNewGame(
+            ctx,
             telegramChatId,
             telegramMessageThreadId,
-            game.question.type as QUESTION_TYPE,
             String(player._id),
           );
 
