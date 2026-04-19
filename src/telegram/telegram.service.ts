@@ -698,9 +698,9 @@ export class TelegramService
             telegramChatId,
             telegramMessageThreadId,
             game.question.type as QUESTION_TYPE,
-            String(ctx.from.id),
+            String(player._id),
           );
-          
+
         } else {
           this.questionService.saveIncorrectAnswer(
             telegramChatId,
