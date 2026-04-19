@@ -80,9 +80,7 @@ export class QuestionService {
     }
 
     this.logger.log(`No questions available for type: ${type}`);
-    throw new InternalServerErrorException(
-      `No questions available for type: ${type}`,
-    );
+    return Promise.resolve(null as any as Question);
   }
 
   public generateClue(question: QuestionDocument, stage: GAME_STAGE): string {

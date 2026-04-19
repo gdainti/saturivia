@@ -25,7 +25,7 @@ import { TelegramModule } from './telegram/telegram.module';
         const safeUsername = encodeURIComponent(username ?? '');
         const safePassword = encodeURIComponent(password ?? '');
 
-        const uri = `mongodb://${safeUsername}:${safePassword}@${host}:${port}/${database}`;
+        const uri = `mongodb://${safeUsername}:${safePassword}@${host}:${port}/${database}?authSource=${authDB}`;
 
         return {
           uri: uri,

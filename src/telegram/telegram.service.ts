@@ -663,6 +663,7 @@ export class TelegramService
             ctx.message.message_id,
             [randomReaction],
           );
+
           const mentionUser = this.mentionUserByTelegramId(
             ctx.from.id,
             ctx.from.username,
@@ -692,6 +693,14 @@ export class TelegramService
             player.username,
             player.telegramId,
           );
+
+          await this.gameService.startNewGame(
+            telegramChatId,
+            telegramMessageThreadId,
+            game.question.type as QUESTION_TYPE,
+            String(ctx.from.id),
+          );
+          
         } else {
           this.questionService.saveIncorrectAnswer(
             telegramChatId,

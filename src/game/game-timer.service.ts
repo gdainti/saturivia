@@ -13,6 +13,7 @@ import { getTimingForStage } from './game-timer.config';
 import { PlayerService } from '../player/player.service';
 import { TelegramService } from 'src/telegram/telegram.service';
 import { GameService } from './game.service';
+import { QUESTION_TYPE } from 'src/question/question-type';
 
 interface GameTimer {
   timer: NodeJS.Timeout;
