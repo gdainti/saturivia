@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { PlayerModule } from './player/player.module';
 import { QuestionModule } from './question/question.module';
 import { GameModule } from './game/game.module';
 import { TelegramModule } from './telegram/telegram.module';
+import { ChGKModule } from './chgk/chgk.module';
 
 @Module({
   imports: [
@@ -12,6 +14,7 @@ import { TelegramModule } from './telegram/telegram.module';
       isGlobal: true,
       envFilePath: '.env',
     }),
+    ScheduleModule.forRoot(),
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => {
@@ -39,6 +42,7 @@ import { TelegramModule } from './telegram/telegram.module';
     QuestionModule,
     GameModule,
     TelegramModule,
+    ChGKModule,
   ],
   controllers: [],
   providers: [],

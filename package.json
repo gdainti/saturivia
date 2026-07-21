@@ -1,6 +1,6 @@
 {
   "name": "saturivia",
-  "version": "1.10.2",
+  "version": "2.0.0",
   "description": "telegram trivia bot",
   "author": "gdainti",
   "private": true,
@@ -33,6 +33,7 @@
     "@nestjs/core": "^11.0.1",
     "@nestjs/mongoose": "^11.0.3",
     "@nestjs/platform-express": "^11.0.1",
+    "@nestjs/schedule": "^6.1.3",
     "cheerio": "^1.0.0-rc.12",
     "mongoose": "^8.19.1",
     "node-fetch": "^2.7.0",

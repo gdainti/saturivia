@@ -72,6 +72,11 @@ export class TelegramService
   private readonly logger = new Logger(TelegramService.name);
   private bot: Telegraf | null = null;
   private isScriptMode: boolean = false;
+  private autoForwardListeners: Array<{
+    channelId: string | number;
+    callback: (channelMsgId: number, discussionMsgId: number) => void;
+  }> = [];
+  private privateOnlyCommands: Array<{ command: string; description: string }> = [];
   private cachedLeaderboard: Array<{
     playerId: string;
     totalScore: number;
@@ -446,7 +451,7 @@ export class TelegramService
     this.bot = new Telegraf(token);
     this.bot.botInfo = await this.bot.telegram.getMe();
 
-    this.setBotCommands();
+    await this.setBotCommands();
     this.setBotTextActions();
 
     this.bot
@@ -561,6 +566,21 @@ export class TelegramService
     });
 
     this.bot.on('message', async (ctx, next) => {
+      const msg = ctx.message as any;
+
+      if (msg.is_automatic_forward && msg.forward_from_chat) {
+        const forwardChatId: number = msg.forward_from_chat.id;
+        const channelMsgId: number = msg.forward_from_message_id;
+        const discussionMsgId: number = msg.message_id;
+        this.logger.log(`Auto-forward detected: channel=${forwardChatId} channelMsgId=${channelMsgId} discussionMsgId=${discussionMsgId}`);
+        for (const listener of this.autoForwardListeners) {
+          if (String(forwardChatId) === String(listener.channelId)) {
+            listener.callback(channelMsgId, discussionMsgId);
+          }
+        }
+        return;
+      }
+
       const telegramChatId = ctx.chat?.id;
       const topicMessage = ctx.message?.is_topic_message;
       // telegramMessageThreadId needs to be filled only for topics, to distinguish threads and main chat
@@ -729,6 +749,7 @@ export class TelegramService
         this.logger.error('Error processing text message', err);
       }
     });
+
   }
 
   public mentionUserByTelegramId(
@@ -807,6 +828,66 @@ export class TelegramService
       await this.bot.telegram.sendMessage(chatId, text, extra);
     } else {
       this.logger.warn('Bot not initialized. Cannot send message.');
+    }
+  }
+
+  async sendChannelPost(channelId: string | number, text: string): Promise<number> {
+    if (!this.bot) throw new Error('Bot not initialized');
+    const message = await this.bot.telegram.sendMessage(channelId, text, this.getDefaultExtra());
+    return message.message_id;
+  }
+
+  async sendDiscussionReply(chatId: string | number, replyToMessageId: number, text: string): Promise<void> {
+    if (!this.bot) throw new Error('Bot not initialized');
+    await this.bot.telegram.sendMessage(chatId, text, {
+      ...this.getDefaultExtra(),
+      reply_to_message_id: replyToMessageId,
+    } as any);
+  }
+
+  registerAutoForwardListener(
+    channelId: string | number,
+    callback: (channelMsgId: number, discussionMsgId: number) => void,
+  ): void {
+    this.autoForwardListeners.push({ channelId, callback });
+  }
+
+  registerBotCommand(
+    command: string,
+    description: string,
+    handler: (ctx: Context) => Promise<void>,
+    options: { privateOnly?: boolean } = {},
+  ): void {
+    if (!this.bot) {
+      this.logger.warn(`Bot not initialized; cannot register /${command}`);
+      return;
+    }
+
+    const { privateOnly = false } = options;
+
+    const wrappedHandler = privateOnly
+      ? async (ctx: Context) => {
+          if (ctx.chat?.type !== 'private') return;
+          return handler(ctx);
+        }
+      : handler;
+
+    this.bot.command(command, wrappedHandler);
+
+    if (privateOnly) {
+      this.privateOnlyCommands.push({ command, description });
+      const allForPrivate = [
+        ...this.botCommands.map(({ command: cmd, description: desc }) => ({ command: cmd, description: desc })),
+        ...this.privateOnlyCommands,
+      ];
+      this.bot.telegram
+        .setMyCommands(allForPrivate, { scope: { type: 'all_private_chats' } } as any)
+        .catch((err) => this.logger.error('Failed to update private bot commands', err));
+    } else {
+      this.botCommands.push({ command, description, action: handler });
+      this.bot.telegram
+        .setMyCommands(this.botCommands.map(({ command: cmd, description: desc }) => ({ command: cmd, description: desc })))
+        .catch((err) => this.logger.error('Failed to update bot commands', err));
     }
   }
 
