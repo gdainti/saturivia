@@ -62,10 +62,10 @@ export class ChGKService implements OnApplicationBootstrap {
 
     this.telegramService.registerBotCommand(
       'chgk_answer',
-      'Post answers for all unanswered ChGK questions',
+      'Post the answer for the oldest unanswered ChGK question',
       async (ctx) => {
-        await ctx.reply('Posting pending ChGK answers…');
-        await this.forcePostPendingAnswers();
+        await ctx.reply('Posting oldest pending ChGK answer…');
+        await this.forcePostOldestPendingAnswer();
       },
       { privateOnly: true, allowedUserId: this.adminTelegramId },
     );
@@ -92,11 +92,12 @@ export class ChGKService implements OnApplicationBootstrap {
     }
   }
 
-  private async forcePostPendingAnswers(): Promise<void> {
-    const pending = await this.chgkPostModel.find({ answerPostedAt: null });
-    for (const post of pending) {
-      await this.postAnswer(post);
-    }
+  private async forcePostOldestPendingAnswer(): Promise<void> {
+    const post = await this.chgkPostModel
+      .findOne({ answerPostedAt: null })
+      .sort({ answerScheduledFor: 1 });
+    if (!post) return;
+    await this.postAnswer(post);
   }
 
   private async postDailyQuestion(): Promise<void> {
