@@ -250,7 +250,7 @@ export class TelegramService
   ];
 
   private getJoinLinkMessage(): string {
-    return `чат викторины: <a href="https://t.me/saturivia_chat">Saturivia chat🪐</a>\n\nчат ЧГК вопросов:  <a href="https://t.me/saturivia_chgk">Saturivia ЧГК🦉</a>`;
+    return `чат викторины: <a href="https://t.me/saturivia_chat">Saturivia chat🪐</a>\nчат ЧГК вопросов:  <a href="https://t.me/saturivia_chgk">Saturivia ЧГК🦉</a>`;
   }
 
   onApplicationBootstrap() {
