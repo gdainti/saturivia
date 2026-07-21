@@ -169,7 +169,7 @@ export class ChGKService implements OnApplicationBootstrap {
   }
 
   private formatQuestion(question: string): string {
-    return `❔<b>Внимание, вопрос:</b>\n\n${question}\n\n<a href="https://db.chgk.info/">db.chgk.info</a>`;
+    return `❔<b>Внимание, вопрос:</b>\n\n${question}\n`;
   }
 
   private formatAnswer(post: ChGKPostDocument): string {
