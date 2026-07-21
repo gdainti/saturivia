@@ -24,6 +24,7 @@ export class ChGKService implements OnApplicationBootstrap {
   private readonly channelId: string;
   private readonly channelChatId: string;
   private readonly isProduction: boolean;
+  private readonly adminTelegramId: number | undefined;
 
   constructor(
     private configService: ConfigService,
@@ -38,6 +39,8 @@ export class ChGKService implements OnApplicationBootstrap {
     this.channelChatId = this.isProduction
       ? (this.configService.get<string>('CHGK_CHANNEL_CHAT_ID') ?? '')
       : (this.configService.get<string>('CHGK_CHANNEL_CHAT_TEST_ID') ?? '');
+    const rawAdminId = this.configService.get<string>('ADMIN_TELEGRAM_ID');
+    this.adminTelegramId = rawAdminId ? parseInt(rawAdminId, 10) : undefined;
   }
 
   async onApplicationBootstrap(): Promise<void> {
@@ -54,7 +57,7 @@ export class ChGKService implements OnApplicationBootstrap {
         await ctx.reply('Fetching new ChGK question…');
         await this.postDailyQuestion();
       },
-      { privateOnly: true },
+      { privateOnly: true, allowedUserId: this.adminTelegramId },
     );
 
     this.telegramService.registerBotCommand(
@@ -64,7 +67,7 @@ export class ChGKService implements OnApplicationBootstrap {
         await ctx.reply('Posting pending ChGK answers…');
         await this.forcePostPendingAnswers();
       },
-      { privateOnly: true },
+      { privateOnly: true, allowedUserId: this.adminTelegramId },
     );
 
   }

@@ -244,7 +244,7 @@ export class TelegramService
           return;
         }
 
-        await ctx.reply('🚧 CHGK questions are in development');
+        await ctx.reply('чат ЧГК вопросов: <a href="https://t.me/saturivia_chgk">Saturivia ЧГК🦉</a>');
       },
     },
   ];
@@ -856,21 +856,32 @@ export class TelegramService
     command: string,
     description: string,
     handler: (ctx: Context) => Promise<void>,
-    options: { privateOnly?: boolean } = {},
+    options: { privateOnly?: boolean; allowedUserId?: number } = {},
   ): void {
     if (!this.bot) {
       this.logger.warn(`Bot not initialized; cannot register /${command}`);
       return;
     }
 
-    const { privateOnly = false } = options;
+    const { privateOnly = false, allowedUserId } = options;
 
-    const wrappedHandler = privateOnly
-      ? async (ctx: Context) => {
-          if (ctx.chat?.type !== 'private') return;
-          return handler(ctx);
-        }
-      : handler;
+    let wrappedHandler = handler;
+
+    if (privateOnly) {
+      const inner = wrappedHandler;
+      wrappedHandler = async (ctx: Context) => {
+        if (ctx.chat?.type !== 'private') return;
+        return inner(ctx);
+      };
+    }
+
+    if (allowedUserId !== undefined) {
+      const inner = wrappedHandler;
+      wrappedHandler = async (ctx: Context) => {
+        if (ctx.from?.id !== allowedUserId) return;
+        return inner(ctx);
+      };
+    }
 
     this.bot.command(command, wrappedHandler);
 
