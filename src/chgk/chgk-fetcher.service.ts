@@ -89,7 +89,9 @@ export class ChGKFetcherService {
       : questionBody;
 
     const question = this.processImageLinks(this.unwrap(questionWithImages));
-    const answer = this.processImageLinks(body.slice(answerIndex).trim());
+    const answer = this.processImageLinks(
+      body.slice(answerIndex).replace(/^\s*Ответ:\s*/i, '').trim(),
+    );
     return { question, answer };
   }
 }
