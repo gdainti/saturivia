@@ -842,6 +842,7 @@ export class TelegramService
     await this.bot.telegram.sendMessage(chatId, text, {
       ...this.getDefaultExtra(),
       reply_to_message_id: replyToMessageId,
+      link_preview_options: { is_disabled: true },
     } as any);
   }
 
