@@ -2,6 +2,7 @@ import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { ConfigService } from '@nestjs/config';
 import { Cron } from '@nestjs/schedule';
+import { TelegramError } from 'telegraf';
 import { Model } from 'mongoose';
 import { TelegramService } from 'src/telegram/telegram.service';
 import { ChGKFetcherService } from './chgk-fetcher.service';
@@ -129,7 +130,7 @@ export class ChGKService implements OnApplicationBootstrap {
       await post.save();
       this.logger.log(`Posted ChGK question, channel message_id=${messageId}`);
 
-      if (this.triviaChatId) {
+      if (this.isProduction && this.triviaChatId) {
         try {
           await this.telegramService.forwardMessage(this.triviaChatId, this.channelId, messageId);
         } catch (err) {
@@ -175,6 +176,14 @@ export class ChGKService implements OnApplicationBootstrap {
       await post.save();
       this.logger.log(`Posted answer for ChGK post ${post._id}`);
     } catch (err) {
+      if (err instanceof TelegramError && /repl/i.test(err.description) && /not found/i.test(err.description)) {
+        post.answerPostedAt = new Date();
+        await post.save();
+        this.logger.warn(
+          `Discussion message for ChGK post ${post._id} was deleted; marking answer as posted without sending it`,
+        );
+        return;
+      }
       this.logger.error(`Failed to post answer: ${(err as Error).message}`);
     }
   }
