@@ -9,10 +9,10 @@ import { ChGKPost, ChGKPostDocument } from './chgk-post.schema';
 
 // ── ChGK timing configuration ────────────────────────────────────────────────
 // How often to post a new question in production (cron expression, Moscow time)
-const QUESTION_CRON = '0 */3 * * *'; // every 3 hours
+const QUESTION_CRON = '0 */4 * * *'; // every 4 hours
 
 // How long to wait before revealing the answer in production
-const PROD_ANSWER_DELAY_MS = 24 * 60 * 60 * 1000; // 24 hours
+const PROD_ANSWER_DELAY_MS = 12 * 60 * 60 * 1000; // 12 hours
 
 // Dev overrides (keep short for testing)
 const DEV_ANSWER_DELAY_MS = 2 * 60 * 1000; // 2 minutes
