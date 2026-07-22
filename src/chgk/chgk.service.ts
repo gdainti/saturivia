@@ -23,6 +23,7 @@ export class ChGKService implements OnApplicationBootstrap {
   private readonly logger = new Logger(ChGKService.name);
   private readonly channelId: string;
   private readonly channelChatId: string;
+  private readonly triviaChatId: string;
   private readonly isProduction: boolean;
   private readonly adminTelegramId: number | undefined;
 
@@ -39,6 +40,7 @@ export class ChGKService implements OnApplicationBootstrap {
     this.channelChatId = this.isProduction
       ? (this.configService.get<string>('CHGK_CHANNEL_CHAT_ID') ?? '')
       : (this.configService.get<string>('CHGK_CHANNEL_CHAT_TEST_ID') ?? '');
+    this.triviaChatId = this.configService.get<string>('SATURIVIA_TRIVIA_CHAT_ID') ?? '';
     const rawAdminId = this.configService.get<string>('ADMIN_TELEGRAM_ID');
     this.adminTelegramId = rawAdminId ? parseInt(rawAdminId, 10) : undefined;
   }
@@ -126,6 +128,14 @@ export class ChGKService implements OnApplicationBootstrap {
       post.channelMessageId = messageId;
       await post.save();
       this.logger.log(`Posted ChGK question, channel message_id=${messageId}`);
+
+      if (this.triviaChatId) {
+        try {
+          await this.telegramService.forwardMessage(this.triviaChatId, this.channelId, messageId);
+        } catch (err) {
+          this.logger.error(`Failed to forward question to trivia chat: ${(err as Error).message}`);
+        }
+      }
     } catch (err) {
       this.logger.error(`Failed to post question: ${(err as Error).message}`);
     }

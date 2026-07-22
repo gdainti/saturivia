@@ -837,6 +837,15 @@ export class TelegramService
     return message.message_id;
   }
 
+  async forwardMessage(
+    toChatId: string | number,
+    fromChatId: string | number,
+    messageId: number,
+  ): Promise<void> {
+    if (!this.bot) throw new Error('Bot not initialized');
+    await this.bot.telegram.forwardMessage(toChatId, fromChatId, messageId);
+  }
+
   async sendDiscussionReply(chatId: string | number, replyToMessageId: number, text: string): Promise<void> {
     if (!this.bot) throw new Error('Bot not initialized');
     await this.bot.telegram.sendMessage(chatId, text, {
