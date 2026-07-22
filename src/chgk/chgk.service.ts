@@ -79,7 +79,7 @@ export class ChGKService implements OnApplicationBootstrap {
     }
   }
 
-  @Cron('* * * * *')
+  @Cron('5 * * * *')
   async checkPendingAnswers(): Promise<void> {
     const pending = await this.chgkPostModel.find({
       answerScheduledFor: { $lte: new Date() },
