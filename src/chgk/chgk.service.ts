@@ -130,13 +130,14 @@ export class ChGKService implements OnApplicationBootstrap {
       await post.save();
       this.logger.log(`Posted ChGK question, channel message_id=${messageId}`);
 
-      if (this.isProduction && this.triviaChatId) {
+      // commenting out auto-forwarding to trivia chat for now
+      /* if (this.isProduction && this.triviaChatId) {
         try {
           await this.telegramService.forwardMessage(this.triviaChatId, this.channelId, messageId);
         } catch (err) {
           this.logger.error(`Failed to forward question to trivia chat: ${(err as Error).message}`);
         }
-      }
+      } */
     } catch (err) {
       this.logger.error(`Failed to post question: ${(err as Error).message}`);
     }
