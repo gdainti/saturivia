@@ -8,16 +8,15 @@ import { TelegramService } from 'src/telegram/telegram.service';
 import { ChGKFetcherService } from './chgk-fetcher.service';
 import { ChGKPost, ChGKPostDocument } from './chgk-post.schema';
 
-// ── ChGK timing configuration ────────────────────────────────────────────────
-// How often to post a new question in production (cron expression, Moscow time)
-const QUESTION_CRON = '0 */4 * * *'; // every 4 hours
+const QUESTION_CRON = '0 12 * * *'; // once a day at the particular hour 
+const CHECK_PENDING_ANSWERS_CRON = '0 * * * *'; // every hour on the hour
 
 // How long to wait before revealing the answer in production
-const PROD_ANSWER_DELAY_MS = 12 * 60 * 60 * 1000; // 12 hours
+const PROD_ANSWER_DELAY_MS = 12 * 60 * 60 * 1000;
 
 // Dev overrides (keep short for testing)
-const DEV_ANSWER_DELAY_MS = 2 * 60 * 1000; // 2 minutes
-// ─────────────────────────────────────────────────────────────────────────────
+const DEV_ANSWER_DELAY_MS = 2 * 60 * 1000;
+
 
 @Injectable()
 export class ChGKService implements OnApplicationBootstrap {
@@ -82,7 +81,7 @@ export class ChGKService implements OnApplicationBootstrap {
     }
   }
 
-  @Cron('5 * * * *')
+  @Cron(CHECK_PENDING_ANSWERS_CRON)
   async checkPendingAnswers(): Promise<void> {
     const pending = await this.chgkPostModel.find({
       answerScheduledFor: { $lte: new Date() },
@@ -131,13 +130,13 @@ export class ChGKService implements OnApplicationBootstrap {
       this.logger.log(`Posted ChGK question, channel message_id=${messageId}`);
 
       // commenting out auto-forwarding to trivia chat for now
-      /* if (this.isProduction && this.triviaChatId) {
+      if (this.isProduction && this.triviaChatId) {
         try {
           await this.telegramService.forwardMessage(this.triviaChatId, this.channelId, messageId);
         } catch (err) {
           this.logger.error(`Failed to forward question to trivia chat: ${(err as Error).message}`);
         }
-      } */
+      }
     } catch (err) {
       this.logger.error(`Failed to post question: ${(err as Error).message}`);
     }
